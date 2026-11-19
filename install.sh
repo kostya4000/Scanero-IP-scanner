@@ -3,6 +3,19 @@
 set -euo pipefail
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
+
+if dpkg-query -W -f='${Status}' scanero-ip-scanner 2>/dev/null | grep -q "install ok installed"; then
+  if [ "${SCANERO_ALLOW_USER_INSTALL:-0}" != "1" ]; then
+    echo "Scanero IP Сканер уже установлен системным пакетом (.deb)."
+    echo "Пользовательская установка создаст ~/.local/bin/scanero, который"
+    echo "перекроет /usr/bin/scanero. Обновите пакет или удалите его:"
+    echo "  sudo apt install --reinstall ./scanero-ip-scanner_*.deb"
+    echo "  sudo apt remove scanero-ip-scanner"
+    echo "Для намеренной установки поверх пакета: SCANERO_ALLOW_USER_INSTALL=1 ./install.sh"
+    exit 1
+  fi
+fi
+
 DEST="${XDG_DATA_HOME:-$HOME/.local/share}/scanero"
 APPS="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 ICONS="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"

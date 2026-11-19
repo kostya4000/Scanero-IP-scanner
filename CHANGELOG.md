@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 — 2026-11-19
+
+- Fixed a stale `~/.local/bin/scanero` from earlier source installs shadowing
+  the system package, so launching still reported an old version.
+- The Debian post-install script now removes stale user-local launchers and
+  desktop shortcuts that point to an old source installation.
+- `install.sh` refuses to create a shadowing user install when the Debian
+  package is already present (unless explicitly overridden).
+
 ## 1.2.0 — 2026-11-19
 
 - Added interface font-size setting (85–120%) with live preview and persistence.

@@ -3,7 +3,7 @@
 **Scanero IP Сканер** — современный сканер локальной сети для Ubuntu: быстрый, красивый и без установки.
 По возможностям повторяет Advanced IP Scanner, но нативно работает в Linux и не требует root.
 
-**Версия 1.2.0** · Репозиторий: <https://github.com/kostya4000/Scanero-IP-scanner>
+**Версия 1.2.1** · Репозиторий: <https://github.com/kostya4000/Scanero-IP-scanner>
 
 ![Scanero IP scanner](docs/screenshot.png)
 
@@ -49,10 +49,15 @@
 <https://github.com/kostya4000/Scanero-IP-scanner/releases/latest>
 
 ```bash
-sudo apt install ./scanero-ip-scanner_1.2.0_all.deb
+sudo apt install ./scanero-ip-scanner_1.2.1_all.deb
 ```
 
 После установки приложение доступно в меню как **Scanero IP Сканер** и командой `scanero`.
+
+> Если раньше вы устанавливали программу через `./install.sh`, старая копия
+> в `~/.local/bin/scanero` может перекрывать системную команду. Удалите её:
+> `rm -f ~/.local/bin/scanero ~/.local/share/applications/scanero.desktop` и
+> удалите `~/.local/share/scanero`. Пакет 1.2.1 также делает это автоматически.
 
 ### Вариант 1. Просто запустить из папки
 

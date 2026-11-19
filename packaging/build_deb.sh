@@ -79,6 +79,29 @@ CONTROL
 cat > "$BUILD/DEBIAN/postinst" <<'SCRIPT'
 #!/bin/sh
 set -e
+
+# Older source installs created ~/.local/bin/scanero, which shadows
+# /usr/bin/scanero in PATH. Remove only links/shortcuts that point to that
+# previous per-user installation.
+for home in /home/* /root; do
+  [ -d "$home" ] || continue
+  link="$home/.local/bin/scanero"
+  if [ -L "$link" ]; then
+    target="$(readlink "$link" 2>/dev/null || true)"
+    case "$target" in
+      */.local/share/scanero/run.sh|*/.local/share/scanero/run.sh/)
+        rm -f "$link"
+        echo "Scanero: removed stale user launcher $link"
+        ;;
+    esac
+  fi
+  desktop="$home/.local/share/applications/scanero.desktop"
+  if [ -f "$desktop" ] && grep -q '\.local/share/scanero/run\.sh' "$desktop" 2>/dev/null; then
+    rm -f "$desktop"
+    echo "Scanero: removed stale user desktop shortcut $desktop"
+  fi
+done
+
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database -q /usr/share/applications || true
 fi
@@ -87,7 +110,18 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 fi
 exit 0
 SCRIPT
-cp "$BUILD/DEBIAN/postinst" "$BUILD/DEBIAN/postrm"
+
+cat > "$BUILD/DEBIAN/postrm" <<'SCRIPT'
+#!/bin/sh
+set -e
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database -q /usr/share/applications || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor || true
+fi
+exit 0
+SCRIPT
 chmod 0755 "$BUILD/DEBIAN/postinst" "$BUILD/DEBIAN/postrm"
 
 (cd "$BUILD" && find usr -type f -print0 | sort -z | xargs -0 md5sum) > "$BUILD/DEBIAN/md5sums"
