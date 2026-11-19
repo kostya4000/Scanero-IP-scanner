@@ -120,15 +120,20 @@ def _focus_after(before: set[str], hints: tuple[str, ...] = ()) -> None:
 
     def worker() -> None:
         last = 0.0
-        # Several attempts handle slow starters such as Chrome/Remmina.
-        for delay in (0.8, 2.0, 3.4):
+        # If a new window is found, focus it once and stop. Otherwise retry and
+        # eventually fall back to an already running handler (browser/file manager).
+        for attempt, delay in enumerate((0.8, 2.0, 3.4)):
             time.sleep(max(0.0, delay - last))
             last = delay
             after = _x11_windows_raw()
             new = sorted(after - before, key=int)
-            targets = new[-2:] if new else _matching_windows_raw(hints)[-2:]
-            for window_id in reversed(targets):
-                _activate_window(window_id)
+            targets = new[-2:]
+            if not targets and attempt >= 1:
+                targets = _matching_windows_raw(hints)[-2:]
+            if targets:
+                for window_id in reversed(targets):
+                    _activate_window(window_id)
+                break
 
     threading.Thread(target=worker, name="scanero-window-focus", daemon=True).start()
 

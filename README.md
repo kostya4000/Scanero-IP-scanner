@@ -3,7 +3,7 @@
 **Scanero IP Сканер** — современный сканер локальной сети для Ubuntu: быстрый, красивый и без установки.
 По возможностям повторяет Advanced IP Scanner, но нативно работает в Linux и не требует root.
 
-**Версия 1.1.0** · Репозиторий: <https://github.com/kostya4000/Scanero-IP-scanner>
+**Версия 1.1.1** · Репозиторий: <https://github.com/kostya4000/Scanero-IP-scanner>
 
 ![Scanero IP scanner](docs/screenshot.png)
 

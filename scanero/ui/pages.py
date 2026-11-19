@@ -161,6 +161,7 @@ class InspectorPanel(QFrame):
         self.device: Device | None = None
         self._favorite = False
         self._iface: Interface | None = None
+        self._last_open = 0.0
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(18, 16, 18, 16)
@@ -361,8 +362,14 @@ class InspectorPanel(QFrame):
         self.mini_radar.update()
 
     def _emit_action(self, action: str) -> None:
-        if self.device is not None:
-            self.action_requested.emit(action, self.device)
+        if self.device is None:
+            return
+        if action == "open_primary":
+            now = time.monotonic()
+            if now - self._last_open < 0.8:
+                return
+            self._last_open = now
+        self.action_requested.emit(action, self.device)
 
     def _toggle_favorite(self) -> None:
         if self.device is not None:

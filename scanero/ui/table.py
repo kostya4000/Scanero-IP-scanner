@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ipaddress
+import time
 from typing import Iterable
 
 from PyQt6.QtCore import (
@@ -604,12 +605,25 @@ class DeviceDelegate(QStyledItemDelegate):
                              int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
                              f"порт {service.port}")
         elif col == COL_SERVICES:
-            if self.tree.hovered_row == row_rect.top():
-                painter.setFont(self.f_small)
-                painter.setPen(QColor(P.accent))
-                painter.drawText(rect.adjusted(10, 0, -10, 0),
-                                 int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter),
-                                 "Открыть  ↗")
+            button = QRectF(rect.right() - 94, row_rect.center().y() - 13, 84, 26)
+            grad = QLinearGradient(button.topLeft(), button.bottomRight())
+            grad.setColorAt(0.0, QColor(P.accent))
+            grad.setColorAt(0.55, QColor(P.logo2))
+            grad.setColorAt(1.0, QColor(P.accent2))
+            painter.setBrush(grad)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawRoundedRect(button, 8, 8)
+            painter.setFont(font(9.6, QFont.Weight.DemiBold))
+            painter.setPen(QColor(P.primary_text))
+            painter.drawText(
+                QRectF(button.left() + 10, button.top(), 52, button.height()),
+                int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
+                "Открыть",
+            )
+            painter.drawPixmap(
+                QRect(int(button.right()) - 20, int(button.top()) + 7, 12, 12),
+                pixmap("arrow-up-right", P.primary_text, 12),
+            )
 
 
 class DeviceTree(QTreeView):
@@ -620,6 +634,8 @@ class DeviceTree(QTreeView):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.hovered_row = -1
+        self._last_service_key: tuple[str, int] | None = None
+        self._last_service_time = 0.0
         self.setRootIsDecorated(False)
         self.setIndentation(26)
         self.setUniformRowHeights(False)
@@ -688,16 +704,42 @@ class DeviceTree(QTreeView):
         devices = self.selected_devices()
         self.device_selected.emit(devices[0] if devices else None)
 
+    def _emit_service(self, device: Device, service: Service) -> None:
+        key = (device.ip, service.port)
+        now = time.monotonic()
+        if key == self._last_service_key and now - self._last_service_time < 0.8:
+            return
+        self._last_service_key = key
+        self._last_service_time = now
+        self.service_activated.emit(device, service)
+
     def _on_double_click(self, index: QModelIndex) -> None:
         if index.parent().isValid():
             service_data = index.sibling(index.row(), 0).data(ROLE_SERVICE)
             device = index.parent().data(ROLE_DEVICE)
             if isinstance(service_data, dict) and isinstance(device, Device):
-                self.service_activated.emit(device, Service.from_dict(service_data))
+                self._emit_service(device, Service.from_dict(service_data))
             return
         device = index.data(ROLE_DEVICE)
         if isinstance(device, Device):
             self.device_activated.emit(device)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        if event.button() == Qt.MouseButton.LeftButton:
+            index = self.indexAt(event.position().toPoint())
+            if (index.isValid() and index.parent().isValid()
+                    and index.column() == COL_SERVICES):
+                rect = self.visualRect(index)
+                button = QRect(rect.right() - 94, rect.top() + (rect.height() - 26) // 2, 84, 26)
+                if button.contains(event.position().toPoint()):
+                    service_data = index.sibling(index.row(), 0).data(ROLE_SERVICE)
+                    device = index.parent().data(ROLE_DEVICE)
+                    if isinstance(service_data, dict) and isinstance(device, Device):
+                        self.setCurrentIndex(index)
+                        self._emit_service(device, Service.from_dict(service_data))
+                    event.accept()
+                    return
+        super().mouseReleaseEvent(event)
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         index = self.indexAt(event.position().toPoint())

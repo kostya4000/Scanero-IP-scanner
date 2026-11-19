@@ -173,7 +173,9 @@ def main(argv: list[str] | None = None) -> int:
             f"{result.services} {plural(result.services, 'сервис', 'сервиса', 'сервисов')}"
         )
         if len(window.scanner.model.devices()) > 5:
-            window.scanner.tree.setCurrentIndex(window.scanner.proxy.index(1, 0))
+            first = window.scanner.proxy.index(0, 0)
+            window.scanner.tree.expand(first)
+            window.scanner.tree.setCurrentIndex(first)
         window._refresh_favorites_ui()
         from scanero.core.netinfo import Interface
         demo_iface = Interface(

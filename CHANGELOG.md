@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1 — 2026-11-19
+
+- Service rows in the main list now have a visible gradient **Открыть** button
+  (same style as **Сканировать**) that works with one click.
+- Double-clicking that button no longer opens the resource twice.
+- Focus helper stops after the first successful activation, so closing a
+  terminal no longer makes focus jump back to it.
+
 ## 1.1.0 — 2026-11-19
 
 - Added light, dark and system themes with live switching in Settings → Appearance.
