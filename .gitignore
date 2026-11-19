@@ -5,3 +5,6 @@ docs/*.local.png
 *.csv
 *.json
 !scanero.desktop.in
+
+build/
+dist/

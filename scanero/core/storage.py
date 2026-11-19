@@ -59,6 +59,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "ports": "21,22,23,53,80,135,139,443,445,515,554,631,3389,5000,5900,8080,8443,9100",
     "notify": True,
     "theme": "system",
+    "font_scale": 1.0,
     "filter": "online",
     "window_size": [1400, 900],
     "window_pos": [],

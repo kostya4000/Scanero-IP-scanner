@@ -18,8 +18,8 @@ from ..core.actions import open_external_url, remote_shutdown_supported, run_rem
 from ..core.models import Device
 from .. import REPO_URL, __version__
 from .icons import icon
-from .theme import P, rgba
-from .widgets import LogoWidget, ToggleSwitch, font
+from .theme import P, rgba, scale_inline_fonts, sp
+from .widgets import LogoWidget, ToggleSwitch, base_font, font, set_widget_font
 
 
 class ShutdownDialog(QDialog):
@@ -28,7 +28,7 @@ class ShutdownDialog(QDialog):
         self.device = device
         self.setWindowTitle("Удалённое выключение")
         self.setModal(True)
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(sp(460))
         self.setStyleSheet(f"QDialog {{ background: {P.dialog_bg}; }}")
         self._proc = None
 
@@ -49,7 +49,7 @@ class ShutdownDialog(QDialog):
         title_box = QVBoxLayout()
         title_box.setSpacing(1)
         title = QLabel("Выключить компьютер")
-        title.setFont(font(17, QFont.Weight.DemiBold))
+        set_widget_font(title, base_font(17, QFont.Weight.DemiBold))
         subtitle = QLabel(f"{device.name or 'Устройство'} · {device.ip}")
         subtitle.setStyleSheet(f"color: {P.muted}; font-size: 12px;")
         title_box.addWidget(title)
@@ -125,6 +125,7 @@ class ShutdownDialog(QDialog):
         buttons.addWidget(cancel)
         buttons.addWidget(self.submit)
         layout.addLayout(buttons)
+        scale_inline_fonts(self)
 
         if not remote_shutdown_supported():
             self.submit.setEnabled(False)
@@ -160,7 +161,7 @@ class AboutDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("О программе")
         self.setModal(True)
-        self.setFixedWidth(510)
+        self.setFixedWidth(sp(510))
         self.setStyleSheet(f"QDialog {{ background: {P.dialog_bg}; }}")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(26, 24, 26, 22)
@@ -171,7 +172,7 @@ class AboutDialog(QDialog):
         box = QVBoxLayout()
         box.setSpacing(2)
         title = QLabel("Scanero IP Сканер")
-        title.setFont(font(22, QFont.Weight.DemiBold))
+        set_widget_font(title, base_font(22, QFont.Weight.DemiBold))
         sub = QLabel(f"Версия {__version__} · сканер сети для Ubuntu")
         sub.setStyleSheet(f"color:{P.muted}; font-size:12px;")
         box.addWidget(title)
@@ -188,7 +189,7 @@ class AboutDialog(QDialog):
         text.setWordWrap(True)
         text.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         text.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        text.setMinimumHeight(130)
+        text.setMinimumHeight(sp(135))
         text.setStyleSheet(f"color:{P.text_soft}; font-size:12px;")
         layout.addWidget(text)
         made = QLabel("Сделано с вниманием к деталям · PyQt6 / Ubuntu")
@@ -206,3 +207,4 @@ class AboutDialog(QDialog):
         close.clicked.connect(self.accept)
         buttons.addWidget(close)
         layout.addLayout(buttons)
+        scale_inline_fonts(self)

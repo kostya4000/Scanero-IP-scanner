@@ -344,6 +344,17 @@ class DeviceDelegate(QStyledItemDelegate):
         self.f_service = font(11.7, QFont.Weight.DemiBold)
         self.f_small = font(9.8, QFont.Weight.Medium)
 
+    def refresh_fonts(self) -> None:
+        self.f_name = font(12.6, QFont.Weight.DemiBold)
+        self.f_sub = font(10.4, QFont.Weight.Normal)
+        self.f_ip = font(11.3, QFont.Weight.Medium, "JetBrains Mono")
+        self.f_mac = font(10.6, QFont.Weight.Normal, "JetBrains Mono")
+        self.f_chip = font(9.3, QFont.Weight.DemiBold)
+        self.f_pill = font(10.2, QFont.Weight.DemiBold)
+        self.f_service = font(11.7, QFont.Weight.DemiBold)
+        self.f_small = font(9.8, QFont.Weight.Medium)
+        self.tree.viewport().update()
+
     # -- sizing --------------------------------------------------------------
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex) -> QSize:  # noqa: N802
         if index.parent().isValid():

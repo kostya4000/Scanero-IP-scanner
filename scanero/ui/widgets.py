@@ -47,14 +47,40 @@ from PyQt6.QtWidgets import (
 
 from ..core.models import Device, Service
 from .icons import icon, pixmap
-from .theme import P, kind_color, rgba, service_color
+from .theme import P, kind_color, rgba, service_color, sp
+
+
+def base_font(size: float, weight: QFont.Weight = QFont.Weight.Normal,
+              family: str = "Inter") -> QFont:
+    f = QFont(family)
+    f.setPixelSize(int(round(size)))
+    f.setWeight(weight)
+    return f
 
 
 def font(size: float, weight: QFont.Weight = QFont.Weight.Normal, family: str = "Inter") -> QFont:
+    """A font scaled by the user's interface font-size preference."""
     f = QFont(family)
-    f.setPixelSize(int(size))
+    f.setPixelSize(sp(size))
     f.setWeight(weight)
     return f
+
+
+def set_widget_font(widget: QWidget, base: QFont) -> None:
+    """Store an unscaled font on a widget and apply it at the current scale."""
+    widget.setProperty("scaneroBaseFont", QFont(base))
+    scaled = QFont(base)
+    if scaled.pixelSize() > 0:
+        scaled.setPixelSize(sp(scaled.pixelSize()))
+    widget.setFont(scaled)
+
+
+def refresh_widget_fonts(root: QWidget) -> None:
+    widgets = [root] + root.findChildren(QWidget)
+    for widget in widgets:
+        stored = widget.property("scaneroBaseFont")
+        if isinstance(stored, QFont):
+            set_widget_font(widget, stored)
 
 
 def plural(n: int, one: str, few: str, many: str) -> str:
@@ -301,11 +327,6 @@ class NetworkCard(QFrame):
         p.setPen(QColor(P.dim))
         p.drawText(QRectF(34, 68, self.width() - 50, 20), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                    "Подключено" if iface else "Недоступно")
-        if iface:
-            p.setPen(QColor(P.dim))
-            p.setFont(font(10.5))
-            label = iface.default_range
-            p.drawText(QRectF(34, 68, self.width() - 48, 20), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
 
 
 class StatCard(QWidget):
@@ -726,11 +747,11 @@ class EmptyState(QWidget):
         layout.addWidget(self.radar, 0, Qt.AlignmentFlag.AlignHCenter)
         layout.addSpacing(12)
         self.title = QLabel("Готовы к сканированию", self)
-        self.title.setFont(font(19, QFont.Weight.DemiBold))
+        set_widget_font(self.title, base_font(19, QFont.Weight.DemiBold))
         self.title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.title)
         self.subtitle = QLabel("", self)
-        self.subtitle.setFont(font(12.5))
+        set_widget_font(self.subtitle, base_font(12.5))
         self.subtitle.setStyleSheet(f"color: {P.muted};")
         self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.subtitle)
@@ -769,7 +790,7 @@ class EmptyState(QWidget):
         self.radar.set_devices(devices)
 
     def refresh_theme(self) -> None:
-        self.subtitle.setStyleSheet(f"color: {P.muted}; font-size: 12.5px;")
+        self.subtitle.setStyleSheet(f"color: {P.muted};")
         self.reset_btn.setStyleSheet("")
         self.progress.update()
         if self._mode == "scanning":
@@ -941,7 +962,8 @@ class Toast(QFrame):
         self.setGraphicsEffect(self._effect)
         self._effect.setOpacity(0.0)
         self._label = QLabel("", self)
-        self._label.setStyleSheet(f"color: {P.text_soft}; font-size: 12.5px;")
+        set_widget_font(self._label, base_font(12.5))
+        self._label.setStyleSheet(f"color: {P.text_soft};")
         self._icon = QLabel("", self)
         self._icon.setFixedSize(18, 18)
         layout = QHBoxLayout(self)
@@ -960,7 +982,7 @@ class Toast(QFrame):
         self._timer.timeout.connect(self._hide)
 
     def refresh_theme(self) -> None:
-        self._label.setStyleSheet(f"color: {P.text_soft}; font-size: 12.5px;")
+        self._label.setStyleSheet(f"color: {P.text_soft};")
         self.setStyleSheet(
             f"QFrame#Toast {{ background: {rgba(P.toast_bg, 0.97)};"
             f" border: 1px solid {P.toast_border}; border-radius: 12px; }}"

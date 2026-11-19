@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Scanero IP Сканер
+Name[en]=Scanero IP scanner
+Name[ru]=Scanero IP Сканер
+GenericName=Сканер сети
+GenericName[en]=Network Scanner
+GenericName[ru]=Сканер сети
+Comment=Современный сканер локальной сети: устройства, MAC, сервисы, RDP и Wake-on-LAN
+Comment[en]=Modern local network scanner: devices, MAC addresses, services, RDP and Wake-on-LAN
+Exec=scanero
+Icon=scanero
+Terminal=false
+Categories=Network;
+Keywords=network;scanner;ip;mac;wol;rdp;smb;lan;scan;
+StartupWMClass=Scanero
+StartupNotify=true

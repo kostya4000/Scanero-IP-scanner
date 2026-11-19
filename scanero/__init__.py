@@ -1,6 +1,6 @@
 """Scanero IP scanner — a modern local network scanner for Ubuntu."""
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 __app_name__ = "Scanero IP scanner"
 __app_name_ru__ = "Scanero IP Сканер"
 __brand__ = "Scanero"

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from dataclasses import asdict, dataclass, fields
 
@@ -113,6 +114,27 @@ LIGHT = Palette(
 )
 
 P = Palette(**asdict(DARK))
+
+_FONT_SCALE = 1.0
+
+
+def current_font_scale() -> float:
+    return _FONT_SCALE
+
+
+def set_font_scale(scale: float) -> float:
+    global _FONT_SCALE
+    try:
+        scale = float(scale)
+    except (TypeError, ValueError):
+        scale = 1.0
+    _FONT_SCALE = max(0.8, min(1.2, scale))
+    return _FONT_SCALE
+
+
+def sp(size: float) -> int:
+    """Scale a base pixel font size for the current global preference."""
+    return max(7, int(round(float(size) * _FONT_SCALE)))
 
 DARK_KIND_COLORS = {
     "router": "#8B8CFF",
@@ -258,6 +280,43 @@ def kind_color(kind: str) -> str:
     return KIND_COLORS.get(kind, P.dim)
 
 
+_INLINE_FONT_RE = re.compile(r"font-size\s*:\s*([0-9.]+)px")
+
+
+def scale_inline_fonts(root, scale: float | None = None) -> None:
+    """Scale font-size declarations in per-widget styles exactly once per scale.
+
+    Inline styles are used by many custom labels; unlike the global QSS they are
+    not regenerated from the palette, so they are rescaled from their previous
+    scale when the user changes the font size.
+    """
+    from PyQt6.QtWidgets import QWidget
+
+    target = current_font_scale() if scale is None else max(0.8, min(1.2, float(scale)))
+    widgets = [root]
+    try:
+        widgets += root.findChildren(QWidget)
+    except Exception:
+        pass
+    for widget in widgets:
+        style = widget.styleSheet()
+        if not style or "font-size" not in style:
+            continue
+        try:
+            old = float(widget.property("scaneroFontScale") or 1.0)
+        except (TypeError, ValueError):
+            old = 1.0
+        if abs(old - target) < 0.001:
+            continue
+        factor = target / old
+
+        def repl(match: re.Match) -> str:
+            return f"font-size: {max(7, int(round(float(match.group(1)) * factor)))}px"
+
+        widget.setStyleSheet(_INLINE_FONT_RE.sub(repl, style))
+        widget.setProperty("scaneroFontScale", target)
+
+
 def qss() -> str:
     accent_soft = rgba(P.accent, 0.1)
     accent_border = rgba(P.accent, 0.26)
@@ -306,17 +365,17 @@ def qss() -> str:
     }}
     QLabel[role="eyebrow"] {{
         color: {P.accent};
-        font-size: 10px;
+        font-size: {sp(10)}px;
         font-weight: 600;
     }}
     QLabel[role="h1"] {{
         color: {P.text};
-        font-size: 24px;
+        font-size: {sp(24)}px;
         font-weight: 600;
     }}
     QLabel[role="h2"] {{
         color: {P.text};
-        font-size: 17px;
+        font-size: {sp(17)}px;
         font-weight: 600;
     }}
     QLabel[role="muted"] {{
@@ -327,12 +386,12 @@ def qss() -> str:
     }}
     QLabel[role="value"] {{
         color: {P.text};
-        font-size: 13px;
+        font-size: {sp(13)}px;
         font-weight: 500;
     }}
     QLabel[role="mono"] {{
         font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
-        font-size: 12px;
+        font-size: {sp(12)}px;
         color: {P.text_soft};
     }}
 
@@ -354,7 +413,7 @@ def qss() -> str:
     }}
     QLineEdit[mono="true"] {{
         font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace;
-        font-size: 12px;
+        font-size: {sp(12)}px;
     }}
 
     QPushButton {{
@@ -363,7 +422,7 @@ def qss() -> str:
         border-radius: 10px;
         padding: 9px 16px;
         color: {P.text_soft};
-        font-size: 12.5px;
+        font-size: {sp(12.5)}px;
         font-weight: 500;
     }}
     QPushButton:hover {{
@@ -385,7 +444,7 @@ def qss() -> str:
         color: {P.primary_text};
         border: none;
         font-weight: 600;
-        font-size: 13px;
+        font-size: {sp(13)}px;
         padding: 11px 20px;
     }}
     QPushButton[variant="primary"]:hover {{
@@ -462,7 +521,7 @@ def qss() -> str:
         border-radius: 15px;
         padding: 6px 13px;
         color: {P.muted};
-        font-size: 12px;
+        font-size: {sp(12)}px;
         font-weight: 500;
     }}
     QPushButton[chip="true"]:hover {{
@@ -521,7 +580,7 @@ def qss() -> str:
         padding: 8px 28px 8px 12px;
         border-radius: 7px;
         color: {P.text_soft};
-        font-size: 12.5px;
+        font-size: {sp(12.5)}px;
     }}
     QMenu::item:selected {{
         background: {rgba(P.accent, 0.12)};
@@ -542,7 +601,7 @@ def qss() -> str:
         border: 1px solid {P.border};
         border-radius: 8px;
         padding: 6px 9px;
-        font-size: 11.5px;
+        font-size: {sp(11.5)}px;
     }}
 
     QScrollArea, QScrollArea > QWidget > QWidget {{
@@ -637,7 +696,7 @@ def qss() -> str:
     }}
     QMessageBox QLabel {{
         color: {P.text_soft};
-        font-size: 13px;
+        font-size: {sp(13)}px;
     }}
     QMessageBox QPushButton {{
         min-width: 92px;

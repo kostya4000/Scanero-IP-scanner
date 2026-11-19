@@ -35,7 +35,7 @@ from .table import (
     DeviceTree,
     favorite_key,
 )
-from .theme import P, kind_color, rgba, service_color
+from .theme import P, kind_color, rgba, scale_inline_fonts, service_color
 from .widgets import (
     Avatar,
     EmptyState,
@@ -49,9 +49,11 @@ from .widgets import (
     StatCard,
     StatusPill,
     ToggleSwitch,
+    base_font,
     font,
     hline,
     plural,
+    set_widget_font,
 )
 
 
@@ -61,16 +63,16 @@ from .widgets import (
 
 def _eyebrow(text: str) -> QLabel:
     label = QLabel(text.upper())
-    f = font(9.6, QFont.Weight.DemiBold)
+    f = base_font(9.6, QFont.Weight.DemiBold)
     f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.4)
-    label.setFont(f)
+    set_widget_font(label, f)
     label.setStyleSheet(f"color: {P.accent};")
     return label
 
 
 def _title(text: str, size: int = 24) -> QLabel:
     label = QLabel(text)
-    label.setFont(font(size, QFont.Weight.DemiBold))
+    set_widget_font(label, base_font(size, QFont.Weight.DemiBold))
     label.setStyleSheet(f"color: {P.text};")
     return label
 
@@ -84,9 +86,9 @@ def _muted(text: str, size: int = 12) -> QLabel:
 
 def _section_label(text: str) -> QLabel:
     label = QLabel(text.upper())
-    f = font(9.4, QFont.Weight.DemiBold)
+    f = base_font(9.4, QFont.Weight.DemiBold)
     f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.1)
-    label.setFont(f)
+    set_widget_font(label, f)
     label.setStyleSheet(f"color: {P.dim};")
     return label
 
@@ -134,7 +136,7 @@ def _settings_card(title: str, subtitle: str = "") -> tuple[QFrame, QVBoxLayout]
     layout.setContentsMargins(20, 18, 20, 14)
     layout.setSpacing(2)
     head = QLabel(title)
-    head.setFont(font(15, QFont.Weight.DemiBold))
+    set_widget_font(head, base_font(15, QFont.Weight.DemiBold))
     layout.addWidget(head)
     if subtitle:
         sub = QLabel(subtitle)
@@ -158,6 +160,7 @@ class InspectorPanel(QFrame):
         super().__init__(parent)
         self.setObjectName("Card")
         self.setFixedWidth(318)
+        self._base_width = 318
         self.device: Device | None = None
         self._favorite = False
         self._iface: Interface | None = None
@@ -187,7 +190,7 @@ class InspectorPanel(QFrame):
         empty_layout.addWidget(self.mini_radar, 0, Qt.AlignmentFlag.AlignHCenter)
         empty_layout.addSpacing(8)
         empty_title = QLabel("Выберите устройство")
-        empty_title.setFont(font(14, QFont.Weight.DemiBold))
+        set_widget_font(empty_title, base_font(14, QFont.Weight.DemiBold))
         empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_layout.addWidget(empty_title)
         empty_hint = QLabel("Нажмите на строку в таблице, чтобы увидеть детали, сервисы и действия.")
@@ -237,7 +240,7 @@ class InspectorPanel(QFrame):
         names = QVBoxLayout()
         names.setSpacing(2)
         self.name_label = QLabel("")
-        self.name_label.setFont(font(15, QFont.Weight.DemiBold))
+        set_widget_font(self.name_label, base_font(15, QFont.Weight.DemiBold))
         self.name_label.setWordWrap(True)
         names.addWidget(self.name_label)
         self.ip_label = QLabel("")
@@ -326,7 +329,8 @@ class InspectorPanel(QFrame):
             lab = QLabel(label)
             lab.setStyleSheet(f"color:{P.dim}; font-size:11px;")
             val = QLabel("—")
-            val.setStyleSheet(f"color:{P.text_soft}; font-size:11.5px;")
+            set_widget_font(val, base_font(11.5))
+            val.setStyleSheet(f"color:{P.text_soft};")
             val.setWordWrap(True)
             val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
             self.info_grid.addWidget(lab, idx, 0, Qt.AlignmentFlag.AlignTop)
@@ -336,6 +340,9 @@ class InspectorPanel(QFrame):
         self.dv.addLayout(self.info_grid)
         self.dv.addStretch(1)
         self.stack.setCurrentIndex(0)
+
+    def apply_font_scale(self, scale: float) -> None:
+        self.setFixedWidth(int(self._base_width * max(1.0, scale)))
 
     def refresh_theme(self) -> None:
         self.star.setIcon(icon(
@@ -357,7 +364,7 @@ class InspectorPanel(QFrame):
         if self.device is not None:
             self.pill.set_status(self.device.status)
         for label in self.info_values.values():
-            label.setStyleSheet(f"color:{P.text_soft}; font-size:11.5px;")
+            label.setStyleSheet(f"color:{P.text_soft};")
         self.avatar.update()
         self.mini_radar.update()
 
@@ -1063,7 +1070,7 @@ class FavoriteCard(QFrame):
         box = QVBoxLayout()
         box.setSpacing(2)
         name = QLabel(favorite.name or "Без имени")
-        name.setFont(font(13, QFont.Weight.DemiBold))
+        set_widget_font(name, base_font(13, QFont.Weight.DemiBold))
         box.addWidget(name)
         meta = QLabel(f"{favorite.ip}    {favorite.mac or 'MAC неизвестен'}")
         meta.setStyleSheet(f"color:{P.muted}; font-family:'JetBrains Mono'; font-size:10.5px;")
@@ -1092,6 +1099,7 @@ class FavoriteCard(QFrame):
         remove = IconButton("trash", 15, P.dim, tooltip="Удалить из избранного")
         remove.clicked.connect(lambda: self.remove_clicked.emit(self.favorite))
         layout.addWidget(remove)
+        scale_inline_fonts(self)
 
 
 class FavoritesPage(QWidget):
@@ -1142,7 +1150,7 @@ class FavoritesPage(QWidget):
         star_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ev.addWidget(star_icon)
         et = QLabel("Пока нет избранных устройств")
-        et.setFont(font(17, QFont.Weight.DemiBold))
+        set_widget_font(et, base_font(17, QFont.Weight.DemiBold))
         et.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ev.addWidget(et)
         ed = _muted("Добавьте устройства из результатов сканирования — они всегда будут под рукой.", 12)
@@ -1212,7 +1220,7 @@ class HistoryCard(QFrame):
         box = QVBoxLayout()
         box.setSpacing(2)
         when = QLabel(entry.date_label)
-        when.setFont(font(12.5, QFont.Weight.DemiBold))
+        set_widget_font(when, base_font(12.5, QFont.Weight.DemiBold))
         box.addWidget(when)
         rng = QLabel(entry.range_expr or "—")
         rng.setStyleSheet(f"color:{P.muted}; font-family:'JetBrains Mono'; font-size:10.5px;")
@@ -1245,6 +1253,7 @@ class HistoryCard(QFrame):
         repeat.setIconSize(QSize(14, 14))
         repeat.clicked.connect(lambda: self.repeat_clicked.emit(self.entry))
         layout.addWidget(repeat)
+        scale_inline_fonts(self)
 
 
 class HistoryPage(QWidget):
@@ -1280,7 +1289,7 @@ class HistoryPage(QWidget):
         ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ev.addWidget(ic)
         et = QLabel("История пока пуста")
-        et.setFont(font(17, QFont.Weight.DemiBold))
+        set_widget_font(et, base_font(17, QFont.Weight.DemiBold))
         et.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ev.addWidget(et)
         ed = _muted("После первого сканирования здесь появятся сохранённые результаты.", 12)
@@ -1329,6 +1338,12 @@ class SettingsPage(QWidget):
         super().__init__(parent)
         self.settings = settings
         self._loading = False
+        self._font_timer = QTimer(self)
+        self._font_timer.setSingleShot(True)
+        self._font_timer.setInterval(250)
+        self._font_timer.timeout.connect(
+            lambda: self._emit("font_scale", self.font_slider.value() / 100.0)
+        )
         root = QVBoxLayout(self)
         root.setContentsMargins(26, 20, 26, 18)
         root.setSpacing(16)
@@ -1367,6 +1382,21 @@ class SettingsPage(QWidget):
             tb.addWidget(btn)
         cl.addWidget(_setting_row("Тема оформления", "Системная подстраивается под оформление Ubuntu.", theme_box))
         cl.addWidget(hline())
+        font_box = QWidget()
+        fb = QVBoxLayout(font_box)
+        fb.setContentsMargins(0, 0, 0, 0)
+        fb.setSpacing(4)
+        self.font_value = QLabel("100%")
+        self.font_value.setStyleSheet(f"color:{P.accent}; font-size:11px;")
+        self.font_slider = QSlider(Qt.Orientation.Horizontal)
+        self.font_slider.setRange(85, 120)
+        self.font_slider.setSingleStep(5)
+        self.font_slider.setPageStep(5)
+        self.font_slider.setFixedWidth(210)
+        self.font_slider.valueChanged.connect(self._font_changed)
+        fb.addWidget(self.font_slider)
+        fb.addWidget(self.font_value)
+        cl.addWidget(_setting_row("Размер шрифта", "Масштаб текста интерфейса от 85% до 120%.", font_box))
         self.layout.addWidget(card)
 
         # performance
@@ -1510,11 +1540,17 @@ class SettingsPage(QWidget):
     def _theme_changed(self, mode: str) -> None:
         self._emit("theme", mode)
 
+    def _font_changed(self, value: int) -> None:
+        self.font_value.setText(f"{value}%")
+        if not self._loading:
+            self._font_timer.start()
+
     def refresh_theme(self) -> None:
         self.refresh_from_settings()
         self.update()
 
     def refresh_from_settings(self) -> None:
+        self._font_timer.stop()
         self._loading = True
         try:
             self.speed_slider.setValue(int(self.settings.get("speed", 3)))
@@ -1530,6 +1566,9 @@ class SettingsPage(QWidget):
             theme = str(self.settings.get("theme", "system"))
             for mode, button in self.theme_buttons.items():
                 button.setChecked(mode == theme)
+            font_percent = int(round(float(self.settings.get("font_scale", 1.0)) * 100))
+            self.font_slider.setValue(max(85, min(120, font_percent)))
+            self.font_value.setText(f"{self.font_slider.value()}%")
             self.ports.setText(str(self.settings.get("ports", "")))
             self.ports.setCursorPosition(0)
         finally:

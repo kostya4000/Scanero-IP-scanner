@@ -62,8 +62,13 @@ from ..core.storage import HistoryEntry, SPEED_MAP, Settings, FavoritesStore, Hi
 from .dialogs import AboutDialog, ShutdownDialog
 from .icons import icon, pixmap
 from .pages import FavoritesPage, HistoryPage, ScannerPage, SettingsPage
-from .theme import P, qss, rgba, set_theme
-from .widgets import IconButton, LogoWidget, NavButton, NetworkCard, Toast, font, plural
+from .theme import (
+    P, current_font_scale, qss, rgba, scale_inline_fonts, set_font_scale, set_theme, sp,
+)
+from .widgets import (
+    IconButton, LogoWidget, NavButton, NetworkCard, Toast,
+    base_font, font, plural, refresh_widget_fonts, set_widget_font,
+)
 from .worker import ScanWorker
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
@@ -137,7 +142,7 @@ class TitleBar(QFrame):
         layout.setSpacing(10)
         layout.addWidget(LogoWidget(30))
         name = QLabel("Scanero IP Сканер")
-        name.setFont(font(15, QFont.Weight.DemiBold))
+        set_widget_font(name, base_font(15, QFont.Weight.DemiBold))
         name.setStyleSheet(f"color:{P.text};")
         layout.addWidget(name)
         dot = QLabel("·")
@@ -274,9 +279,13 @@ class MainWindow(QWidget):
         self._theme_pref = str(self.settings.get("theme", "system"))
         self._resolved_theme = set_theme(self._theme_pref)
         self._applying_theme = False
+        self._font_scale = set_font_scale(float(self.settings.get("font_scale", 1.0)))
         app = QApplication.instance()
         if app is not None:
             app.setStyleSheet(qss())
+            app_font = QFont("Inter")
+            app_font.setPixelSize(sp(13))
+            app.setFont(app_font)
         self.favorites = FavoritesStore()
         self.history = HistoryStore()
         self.interfaces: list[Interface] = []
@@ -324,9 +333,9 @@ class MainWindow(QWidget):
         side.setContentsMargins(12, 14, 12, 12)
         side.setSpacing(4)
         nav_label = QLabel("НАВИГАЦИЯ")
-        nf = font(9.2, QFont.Weight.DemiBold)
+        nf = base_font(9.2, QFont.Weight.DemiBold)
         nf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.3)
-        nav_label.setFont(nf)
+        set_widget_font(nav_label, nf)
         nav_label.setStyleSheet(f"color:{P.dim}; margin-left:8px; margin-bottom:4px;")
         side.addWidget(nav_label)
 
@@ -358,7 +367,8 @@ class MainWindow(QWidget):
         self.repo_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
         self.repo_link.setOpenExternalLinks(False)
         self.repo_link.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.repo_link.setStyleSheet(f"font-size:10.5px; padding-left:14px; color:{P.accent_soft};")
+        set_widget_font(self.repo_link, base_font(10.5))
+        self.repo_link.setStyleSheet(f"padding-left:14px; color:{P.accent_soft};")
         self.repo_link.setToolTip(REPO_URL)
         self.repo_link.linkActivated.connect(lambda _=None: self._open_repository())
         side.addWidget(self.repo_link)
@@ -429,6 +439,8 @@ class MainWindow(QWidget):
         self._refresh_interfaces(initial=True)
         self._refresh_favorites_ui()
         self._restore_geometry()
+        self.scanner.inspector.apply_font_scale(current_font_scale())
+        scale_inline_fonts(self, current_font_scale())
         self.switch_page("scanner")
         QTimer.singleShot(80, self._sync_inspector)
 
@@ -525,6 +537,7 @@ class MainWindow(QWidget):
             self._wide = wide
             self.scanner.inspector_btn.setChecked(wide)
             self.scanner.inspector.setVisible(wide)
+            self.scanner.search.setFixedWidth(248 if wide else 190)
 
     def _restore_geometry(self) -> None:
         screen = QApplication.primaryScreen()
@@ -1012,6 +1025,11 @@ class MainWindow(QWidget):
         if key == "theme":
             self._apply_theme(str(value))
             return
+        if key == "font_scale":
+            self.settings.set("font_scale", float(value), save=False)
+            self._apply_font_scale(float(value))
+            self._save_timer.start()
+            return
         if key == "speed":
             speed = SPEED_MAP.get(int(value), SPEED_MAP[3])
             self.settings.set("speed", int(value), save=False)
@@ -1035,6 +1053,30 @@ class MainWindow(QWidget):
 
         if detect_system_mode() != self._resolved_theme:
             self._apply_theme("system", save=False)
+
+    def _apply_font_scale(self, scale: float, *, save: bool = True) -> None:
+        previous = current_font_scale()
+        new_scale = set_font_scale(scale)
+        self._font_scale = new_scale
+        if save:
+            self.settings.set("font_scale", new_scale, save=False)
+            self._save_timer.start()
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(qss())
+            app_font = QFont("Inter")
+            app_font.setPixelSize(sp(13))
+            app.setFont(app_font)
+        if abs(previous - new_scale) > 0.001:
+            scale_inline_fonts(self, new_scale)
+            refresh_widget_fonts(self)
+            self.scanner.inspector.apply_font_scale(new_scale)
+            delegate = self.scanner.tree.itemDelegate()
+            if hasattr(delegate, "refresh_fonts"):
+                delegate.refresh_fonts()
+        for widget in self.findChildren(QWidget):
+            widget.update()
+        self.update()
 
     def _apply_theme(self, preference: str, *, save: bool = True) -> None:
         if self._applying_theme:
@@ -1129,7 +1171,8 @@ class MainWindow(QWidget):
             f'<a href="{REPO_URL}" style="color:{P.dim}; text-decoration:none;">'
             "Репозиторий на GitHub</a>"
         )
-        self.repo_link.setStyleSheet(f"font-size:10.5px; padding-left:14px; color:{P.accent_soft};")
+        set_widget_font(self.repo_link, base_font(10.5))
+        self.repo_link.setStyleSheet(f"padding-left:14px; color:{P.accent_soft};")
         self.update()
         self.root.update()
         for widget in self.findChildren(QWidget):
@@ -1148,6 +1191,8 @@ class MainWindow(QWidget):
         self.settings.data.update(keep)
         self.settings.save()
         self.settings_page.refresh_from_settings()
+        self._apply_theme(str(self.settings.get("theme", "system")), save=False)
+        self._apply_font_scale(float(self.settings.get("font_scale", 1.0)), save=False)
         self.scanner.set_filter(self.settings.get("filter", "online"))
         self.toast.show_message("Настройки сброшены", "ok")
 

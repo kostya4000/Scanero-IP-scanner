@@ -1,0 +1,41 @@
+.TH SCANERO 1 "19 Nov 2026" "Scanero IP scanner 1.2.0" "User Commands"
+.SH NAME
+scanero \- modern local network scanner for Ubuntu
+.SH SYNOPSIS
+.B scanero
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B Scanero IP scanner
+discovers devices in local IPv4 networks, resolves names, identifies vendors
+and open services, and can open SMB/FTP/HTTP/RDP resources. It also supports
+Wake-on-LAN, remote shutdown of Windows hosts, favorites, history and reports.
+.PP
+Run without arguments to start the graphical interface.
+.SH OPTIONS
+.TP
+.B \-\-cli
+Run the command-line scanner instead of the GUI.
+.TP
+.B \-\-version
+Print the version.
+.TP
+.B \-\-help
+Show help.
+.PP
+Use
+.B scanero \-\-cli \-\-help
+for command-line scanning options.
+.SH FILES
+.TP
+.I ~/.config/scanero/settings.json
+Application settings.
+.TP
+.I ~/.config/scanero/favorites.json
+Saved favorites.
+.TP
+.I ~/.config/scanero/history.json
+Scan history.
+.SH SEE ALSO
+https://github.com/kostya4000/Scanero-IP-scanner
+.SH AUTHOR
+kostya4000

@@ -1,0 +1,7 @@
+scanero-ip-scanner (1.2.0) unstable; urgency=medium
+
+  * Add adjustable interface font size (85–120%).
+  * Add Debian package, desktop launcher and man page.
+  * Improve name discovery and external-window focus.
+
+ -- kostya4000 <2225821+kostya4000@users.noreply.github.com>  Thu, 19 Nov 2026 17:30:00 +0500

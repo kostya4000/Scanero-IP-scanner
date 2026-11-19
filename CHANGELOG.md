@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0 — 2026-11-19
+
+- Added interface font-size setting (85–120%) with live preview and persistence.
+- Added a Debian package for Ubuntu (`scanero-ip-scanner_1.2.0_all.deb`).
+- Published the package in GitHub Releases.
+- Responsive font scaling for tables, sidebar, inspector, dialogs and settings.
+
 ## 1.1.1 — 2026-11-19
 
 - Service rows in the main list now have a visible gradient **Открыть** button
