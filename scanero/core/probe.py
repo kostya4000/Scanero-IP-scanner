@@ -249,6 +249,128 @@ def http_probe(ip: str, port: int, tls: bool = False, timeout: float = 1.0) -> d
     return result
 
 
+# ---------------------------------------------------------------------------
+# SNMP sysName (v2c, community "public")
+# ---------------------------------------------------------------------------
+
+def _ber_len(length: int) -> bytes:
+    if length < 0x80:
+        return bytes([length])
+    raw = length.to_bytes((length.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(raw)]) + raw
+
+
+def _ber(tag: int, value: bytes) -> bytes:
+    return bytes([tag]) + _ber_len(len(value)) + value
+
+
+def _ber_int(value: int) -> bytes:
+    if value == 0:
+        return b"\x00"
+    length = (value.bit_length() + 8) // 8
+    return value.to_bytes(length, "big", signed=True)
+
+
+def _ber_oid(oid: str) -> bytes:
+    parts = [int(part) for part in oid.split(".")]
+    encoded = bytearray([40 * parts[0] + parts[1]])
+    for part in parts[2:]:
+        if part == 0:
+            encoded.append(0)
+            continue
+        chunks = []
+        while part:
+            chunks.append(part & 0x7F)
+            part >>= 7
+        for idx, chunk in enumerate(reversed(chunks)):
+            encoded.append(chunk | (0x80 if idx < len(chunks) - 1 else 0))
+    return bytes(encoded)
+
+
+def _ber_read(data: bytes, offset: int) -> tuple[int, bytes, int]:
+    tag = data[offset]
+    offset += 1
+    length = data[offset]
+    offset += 1
+    if length & 0x80:
+        count = length & 0x7F
+        length = int.from_bytes(data[offset:offset + count], "big")
+        offset += count
+    return tag, data[offset:offset + length], offset + length
+
+
+def snmp_sysname(ip: str, community: str = "public", timeout: float = 0.6) -> str:
+    """Read the SNMP sysName.0 scalar; works with v1/v2c agents."""
+    request_id = int(time.time() * 1000) & 0x7FFFFFFF
+    varbind = _ber(0x30, _ber(0x06, _ber_oid("1.3.6.1.2.1.1.5.0")) + _ber(0x05, b""))
+    pdu = _ber(
+        0xA0,
+        _ber(0x02, _ber_int(request_id))
+        + _ber(0x02, b"\x00")
+        + _ber(0x02, b"\x00")
+        + _ber(0x30, varbind),
+    )
+    message = _ber(
+        0x30,
+        _ber(0x02, b"\x01") + _ber(0x04, community.encode("utf-8")) + pdu,
+    )
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.settimeout(timeout)
+        sock.sendto(message, (ip, 161))
+        data, _ = sock.recvfrom(4096)
+    except Exception:
+        return ""
+    finally:
+        sock.close()
+    try:
+        _, content, _ = _ber_read(data, 0)  # message sequence
+        offset = 0
+        _, _, offset = _ber_read(content, offset)  # version
+        _, _, offset = _ber_read(content, offset)  # community
+        _, pdu_content, _ = _ber_read(content, offset)
+        offset = 0
+        _, _, offset = _ber_read(pdu_content, offset)  # request id
+        _, _, offset = _ber_read(pdu_content, offset)  # error status
+        _, _, offset = _ber_read(pdu_content, offset)  # error index
+        _, vbl_content, _ = _ber_read(pdu_content, offset)
+        _, varbind_content, _ = _ber_read(vbl_content, 0)
+        offset = 0
+        _, _, offset = _ber_read(varbind_content, offset)  # oid
+        _, value, _ = _ber_read(varbind_content, offset)
+        text = value.decode("utf-8", errors="ignore").strip()
+        text = re.sub(r"\s+", " ", text)
+        return text[:64]
+    except Exception:
+        return ""
+
+
+def tls_cert_name(ip: str, port: int = 443, timeout: float = 1.0) -> str:
+    """Return the certificate common name / first DNS SAN, if any."""
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((ip, port), timeout=timeout) as raw:
+            raw.settimeout(timeout)
+            with ctx.wrap_socket(raw, server_hostname=ip) as sock:
+                cert = sock.getpeercert() or {}
+        for rdn in cert.get("subject", ()):
+            for key, value in rdn:
+                if key == "commonName":
+                    name = str(value).strip().strip("*.")
+                    if name and not name.replace(".", "").isdigit():
+                        return name[:64]
+        for kind, value in cert.get("subjectAltName", ()):
+            if kind == "DNS":
+                name = str(value).strip().strip("*.")
+                if name and not name.replace(".", "").isdigit():
+                    return name[:64]
+    except Exception:
+        pass
+    return ""
+
+
 def banner_grab(ip: str, port: int, timeout: float = 0.8) -> str:
     try:
         with socket.create_connection((ip, port), timeout=timeout) as sock:
@@ -348,17 +470,29 @@ def guess_kind(device: Device) -> str:
     ports = {s.port for s in device.services}
     name = (device.name or device.hostname or "").lower()
 
-    if ports & {9100, 515, 631}:
+    printer_hint = any(
+        word in (name + " " + title + " " + vendor)
+        for word in ("printer", "laserjet", "officejet", "ecotank", "mfp")
+    )
+    router_identity = (
+        any(word in vendor for word in _ROUTER_VENDORS)
+        or any(word in name + " " + title for word in _ROUTER_NAME_HINTS)
+    )
+
+    if any(word in vendor for word in _PRINTER_VENDORS) and printer_hint:
         return "printer"
-    if any(word in vendor for word in _PRINTER_VENDORS):
-        if any(word in (vendor + " " + title + " " + name) for word in ("printer", "laserjet", "officejet", "ecotank", "mfp")):
-            return "printer"
     if ports & {554, 8554} or any(word in vendor for word in _CAMERA_VENDORS):
         return "camera"
     if any(word in vendor for word in _NAS_VENDORS):
         return "nas"
     if ports & {62078}:
         return "phone"
+    # A router/AP can expose RAW printing (9100) as a USB print server;
+    # its identity is stronger than the generic printer ports.
+    if router_identity and not printer_hint and not (ports & {515, 631}):
+        return "router"
+    if ports & {9100, 515, 631}:
+        return "printer"
 
     # Desktop-ish ports are the strongest signal and beat router vendors
     # (motherboard vendors are also present in home routers).
@@ -373,7 +507,7 @@ def guess_kind(device: Device) -> str:
         return "tablet" if "ipad" in name else "phone"
     if "ipad" in name:
         return "tablet"
-    if any(word in name for word in ("printer", "laserjet", "officejet", "ecotank")):
+    if printer_hint:
         return "printer"
     if any(word in name for word in ("camera", "ipcam", "ipc-", "nvr-")):
         return "camera"
@@ -382,7 +516,7 @@ def guess_kind(device: Device) -> str:
     if any(word in name for word in ("smart-tv", "bravia", "webos")) or name.endswith("-tv"):
         return "tv"
 
-    if any(word in vendor for word in _ROUTER_VENDORS) or any(word in name + " " + title for word in _ROUTER_NAME_HINTS):
+    if router_identity:
         return "router"
 
     if any(word in vendor for word in _TV_VENDORS):
@@ -397,6 +531,8 @@ def guess_kind(device: Device) -> str:
         return "server" if "linux" in (device.os_name or "").lower() else "computer"
     if "ssh" in kinds:
         return "computer"
+    if any(token in vendor for token in ("espressif", "tuya", "itead", "shelly", "sonoff")):
+        return "iot"
     if any(word in vendor for word in _PHONE_VENDORS):
         return "phone"
     return "unknown"
@@ -483,6 +619,7 @@ def enrich_device(
     neighbors: dict[str, dict[str, str]],
     pre_ports: Iterable[int] = (),
     local_macs: dict[str, str] | None = None,
+    discovery_names: dict[str, str] | None = None,
 ) -> Device:
     device.status = STATUS_ONLINE
     device.last_seen = time.time()
@@ -529,17 +666,29 @@ def enrich_device(
             merged[service.port] = service
     device.services = sorted(merged.values(), key=lambda s: s.port)
 
+    friendly = (discovery_names or {}).get(device.ip, "")
     if not device.name:
         if device.netbios:
             device.name = device.netbios
+        elif friendly:
+            device.name = friendly
         elif device.hostname:
             device.name = _short_hostname(device.hostname)
         else:
             for service in device.services:
+                if service.kind in ("https",) or service.port in (443, 8443):
+                    cert_name = tls_cert_name(device.ip, service.port)
+                    if cert_name:
+                        device.name = cert_name
+                        break
                 candidate = _title_as_name(service.title)
                 if candidate:
                     device.name = candidate
                     break
+    if not device.name and getattr(options, "use_snmp", True):
+        sysname = snmp_sysname(device.ip)
+        if sysname:
+            device.name = sysname
 
     device.kind = guess_kind(device)
     device.os_name = guess_os(device)

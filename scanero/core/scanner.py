@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
+from .discovery import discover_names
 from .models import Device, STATUS_OFFLINE, STATUS_ONLINE
 from .netinfo import Interface, list_interfaces, local_mac_map, neighbor_table
 from .probe import enrich_device, probe_alive
@@ -32,6 +33,8 @@ class ScanOptions:
     use_netbios: bool = True
     use_mdns: bool = True
     tcp_discovery: bool = True
+    use_ssdp: bool = True
+    use_snmp: bool = True
     ports: list[int] = field(default_factory=lambda: list(DEFAULT_PORTS))
     interfaces: list[Interface] = field(default_factory=list)
 
@@ -83,6 +86,16 @@ def scan_network(
     local_hostname = socket.gethostname()
     local_ips = set(local_macs)
     neighbors_before = neighbor_table()
+
+    # mDNS/SSDP discovery runs in parallel with the ping sweep and gives
+    # friendly names to TVs, phones, printers, NAS boxes and IoT devices.
+    discovery_executor = None
+    discovery_future = None
+    if options.resolve_names:
+        discovery_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="scanero-discovery")
+        discovery_future = discovery_executor.submit(
+            discover_names, 2.4, options.use_mdns, getattr(options, "use_ssdp", True)
+        )
 
     alive: dict[str, dict] = {}
     completed = 0
@@ -155,6 +168,15 @@ def scan_network(
             cancelled=True,
         )
 
+    discovery_names: dict[str, str] = {}
+    if discovery_future is not None:
+        try:
+            discovery_names = discovery_future.result(timeout=4.0)
+        except Exception:
+            discovery_names = {}
+    if discovery_executor is not None:
+        discovery_executor.shutdown(wait=False, cancel_futures=True)
+
     # ------------------------------------------------------------------
     # ARP table: find hosts that ignore ICMP but still answer ARP.
     # ------------------------------------------------------------------
@@ -197,6 +219,7 @@ def scan_network(
                 neighbors,
                 info["pre_ports"],
                 local_macs,
+                discovery_names,
             )] = ip
         completed = 0
         last_progress = 0.0
@@ -257,7 +280,9 @@ def scan_network(
     devices = list(devices_by_ip.values())
     for info in alive.values():
         if info["device"].ip not in devices_by_ip:
-            devices.append(enrich_device(info["device"], options, neighbors, info["pre_ports"], local_macs))
+            devices.append(enrich_device(
+                info["device"], options, neighbors, info["pre_ports"], local_macs, discovery_names
+            ))
     devices.extend(offline_devices)
     devices.sort(key=lambda d: tuple(int(x) for x in d.ip.split(".")))
 

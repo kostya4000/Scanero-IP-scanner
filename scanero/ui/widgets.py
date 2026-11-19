@@ -47,7 +47,7 @@ from PyQt6.QtWidgets import (
 
 from ..core.models import Device, Service
 from .icons import icon, pixmap
-from .theme import P, kind_color, service_color
+from .theme import P, kind_color, rgba, service_color
 
 
 def font(size: float, weight: QFont.Weight = QFont.Weight.Normal, family: str = "Inter") -> QFont:
@@ -84,20 +84,20 @@ class LogoWidget(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(1, 1, self._size - 2, self._size - 2)
         grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        grad.setColorAt(0.0, QColor("#2BE0F5"))
-        grad.setColorAt(0.55, QColor("#4FA8FF"))
-        grad.setColorAt(1.0, QColor("#8B8CFF"))
+        grad.setColorAt(0.0, QColor(P.logo1))
+        grad.setColorAt(0.55, QColor(P.logo2))
+        grad.setColorAt(1.0, QColor(P.logo3))
         path = QPainterPath()
         path.addRoundedRect(rect, self._size * 0.3, self._size * 0.3)
         p.fillPath(path, grad)
-        p.setPen(QPen(QColor(6, 16, 28, 160), max(1.0, self._size / 26)))
+        p.setPen(QPen(QColor(P.primary_text), max(1.0, self._size / 26)))
         cx, cy = self._size / 2, self._size / 2
         r = self._size * 0.28
         p.drawEllipse(QRectF(cx - r, cy - r, 2 * r, 2 * r))
-        p.setPen(QPen(QColor(6, 16, 28, 220), max(1.2, self._size / 20)))
+        p.setPen(QPen(QColor(P.primary_text), max(1.2, self._size / 20)))
         p.drawLine(QPointF(cx, cy), QPointF(cx + r * 0.72, cy - r * 0.72))
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(6, 16, 28, 220))
+        p.setBrush(QColor(P.primary_text))
         p.drawEllipse(QPointF(cx + r * 0.72, cy - r * 0.72), self._size * 0.035, self._size * 0.035)
 
 
@@ -186,7 +186,7 @@ class NavButton(QAbstractButton):
             p.setPen(QPen(QColor(34, 211, 238, 40), 1))
             p.drawRoundedRect(rect.adjusted(4, 2, -4, -2), 11, 11)
         elif self._hover > 0:
-            bg = QColor(255, 255, 255)
+            bg = QColor(P.hover_rgb)
             bg.setAlpha(int(9 * self._hover))
             p.setBrush(bg)
             p.setPen(Qt.PenStyle.NoPen)
@@ -210,7 +210,7 @@ class NavButton(QAbstractButton):
             fm = QFontMetrics(font(10.5, QFont.Weight.DemiBold))
             bw = max(22, fm.horizontalAdvance(self._badge) + 12)
             br = QRectF(self.width() - bw - 16, 13, bw, 18)
-            bg = QColor(P.accent if self._active else "#2B3A52")
+            bg = QColor(P.accent if self._active else P.badge_bg)
             bg.setAlpha(40 if self._active else 160)
             p.setBrush(bg)
             p.setPen(Qt.PenStyle.NoPen)
@@ -254,19 +254,22 @@ class NetworkCard(QFrame):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        bg = QColor("#0F1829")
-        bg.setAlpha(235 if self._hover else 205)
+        bg = QColor(P.card)
+        bg.setAlpha(240 if self._hover else 220)
         p.setBrush(bg)
-        p.setPen(QPen(QColor("#243652" if self._hover else "#1A2940"), 1))
+        p.setPen(QPen(QColor(P.border_hover if self._hover else P.border_soft), 1))
         p.drawRoundedRect(rect, 14, 14)
 
         # Icon tile
         tile = QRectF(14, 16, 34, 34)
         grad = QLinearGradient(tile.topLeft(), tile.bottomRight())
-        grad.setColorAt(0, QColor(34, 211, 238, 45))
-        grad.setColorAt(1, QColor(139, 140, 255, 28))
+        c1 = QColor(P.accent); c1.setAlpha(45)
+        c2 = QColor(P.accent2); c2.setAlpha(28)
+        grad.setColorAt(0, c1)
+        grad.setColorAt(1, c2)
         p.setBrush(grad)
-        p.setPen(QPen(QColor(34, 211, 238, 60), 1))
+        border = QColor(P.accent); border.setAlpha(60)
+        p.setPen(QPen(border, 1))
         p.drawRoundedRect(tile, 10, 10)
         iface = self._iface
         icon_name = "wifi" if (iface and iface.wireless) else "ethernet"
@@ -289,7 +292,8 @@ class NetworkCard(QFrame):
 
         dot = QPointF(22, 78)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(61, 220, 151, 50))
+        glow = QColor(P.green); glow.setAlpha(50)
+        p.setBrush(glow)
         p.drawEllipse(dot, 7, 7)
         p.setBrush(QColor(P.green))
         p.drawEllipse(dot, 3.2, 3.2)
@@ -323,6 +327,10 @@ class StatCard(QWidget):
 
     def _on_anim(self, value) -> None:
         self._display = str(int(value))
+        self.update()
+
+    def set_color(self, color: str) -> None:
+        self._color = color
         self.update()
 
     def set_value(self, value: int | str, hint: str = "", animate: bool = True) -> None:
@@ -364,8 +372,10 @@ class StatCard(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        p.setBrush(QColor("#0F1829" if self._hover else "#0E1728"))
-        p.setPen(QPen(QColor("#233654" if self._hover else "#18253B"), 1))
+        bg = QColor(P.card_hover if self._hover else P.card)
+        bg.setAlpha(250 if self._hover else 235)
+        p.setBrush(bg)
+        p.setPen(QPen(QColor(P.border_hover if self._hover else P.border_soft), 1))
         p.drawRoundedRect(rect, 15, 15)
 
         tile = QRectF(self.width() - 48, 14, 32, 32)
@@ -436,7 +446,7 @@ class Avatar(QWidget):
         )
         if self._online:
             dot = QPointF(self._size - 10, self._size - 10)
-            p.setPen(QPen(QColor("#0B1320"), 3))
+            p.setPen(QPen(QColor(P.card), 3))
             p.setBrush(QColor(P.green))
             p.drawEllipse(dot, 5, 5)
 
@@ -477,7 +487,7 @@ class StatusPill(QWidget):
         p.setBrush(c)
         p.drawEllipse(QPointF(12, self.height() / 2), 3.1, 3.1)
         p.setFont(font(10.5, QFont.Weight.DemiBold))
-        p.setPen(c.lighter(115))
+        p.setPen(c.darker(112) if P.mode == "light" else c.lighter(115))
         p.drawText(QRectF(20, 0, self.width() - 24, self.height()), Qt.AlignmentFlag.AlignVCenter, self._text)
 
 
@@ -515,7 +525,7 @@ class ToggleSwitch(QAbstractButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         track = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        off = QColor("#223148")
+        off = QColor(P.toggle_off)
         on = QColor(P.accent)
         mix = QColor(
             int(off.red() + (on.red() - off.red()) * self._pos),
@@ -526,7 +536,7 @@ class ToggleSwitch(QAbstractButton):
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(track, 12, 12)
         knob_x = 3 + (self.width() - 27) * self._pos
-        p.setBrush(QColor("#F2FAFF"))
+        p.setBrush(QColor(P.knob))
         p.drawEllipse(QRectF(knob_x, 3, 18, 18))
 
 
@@ -573,8 +583,10 @@ class RadarWidget(QWidget):
 
         # soft radial backdrop
         bg = QRadialGradient(QPointF(cx, cy), maxr * 1.2)
-        bg.setColorAt(0, QColor(34, 211, 238, 16))
-        bg.setColorAt(0.65, QColor(139, 140, 255, 7))
+        a1 = QColor(P.glow1); a1.setAlpha(16)
+        a2 = QColor(P.glow2); a2.setAlpha(7)
+        bg.setColorAt(0, a1)
+        bg.setColorAt(0.65, a2)
         bg.setColorAt(1, QColor(0, 0, 0, 0))
         p.setBrush(bg)
         p.setPen(Qt.PenStyle.NoPen)
@@ -582,7 +594,8 @@ class RadarWidget(QWidget):
 
         for i in range(4):
             r = maxr * (0.26 + i * 0.245)
-            pen = QPen(QColor(103, 132, 168, 46 if i < 3 else 70))
+            grid = QColor(P.grid); grid.setAlpha(46 if i < 3 else 70)
+            pen = QPen(grid)
             pen.setWidthF(1.0)
             if i == 0:
                 pen.setStyle(Qt.PenStyle.DashLine)
@@ -590,7 +603,7 @@ class RadarWidget(QWidget):
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawEllipse(QPointF(cx, cy), r, r)
 
-        p.setPen(QPen(QColor(103, 132, 168, 32), 1))
+        p.setPen(QPen(QColor(P.grid), 1))
         p.drawLine(QPointF(cx - maxr, cy), QPointF(cx + maxr, cy))
         p.drawLine(QPointF(cx, cy - maxr), QPointF(cx, cy + maxr))
 
@@ -599,7 +612,7 @@ class RadarWidget(QWidget):
             a = math.radians(deg)
             r1 = maxr
             r2 = maxr - (6 if deg % 30 == 0 else 3)
-            p.setPen(QPen(QColor(103, 132, 168, 55), 1))
+            p.setPen(QPen(QColor(P.grid), 1))
             p.drawLine(
                 QPointF(cx + r1 * math.cos(a), cy + r1 * math.sin(a)),
                 QPointF(cx + r2 * math.cos(a), cy + r2 * math.sin(a)),
@@ -608,10 +621,11 @@ class RadarWidget(QWidget):
         # sweep
         sweep = QRectF(cx - maxr, cy - maxr, maxr * 2, maxr * 2)
         grad = QConicalGradient(QPointF(cx, cy), -self._angle)
-        c0 = QColor(34, 211, 238, 96)
-        c1 = QColor(34, 211, 238, 0)
+        c0 = QColor(P.accent); c0.setAlpha(96)
+        c1 = QColor(P.accent); c1.setAlpha(0)
         grad.setColorAt(0.0, c0)
-        grad.setColorAt(0.1, QColor(34, 211, 238, 38))
+        mid = QColor(P.accent); mid.setAlpha(38)
+        grad.setColorAt(0.1, mid)
         grad.setColorAt(0.19, c1)
         grad.setColorAt(1.0, c1)
         p.setBrush(grad)
@@ -620,7 +634,8 @@ class RadarWidget(QWidget):
 
         line_end = QPointF(cx + maxr * math.cos(math.radians(-self._angle)),
                            cy + maxr * math.sin(math.radians(-self._angle)))
-        p.setPen(QPen(QColor(34, 211, 238, 170), 1.4))
+        sweep_color = QColor(P.accent); sweep_color.setAlpha(170)
+        p.setPen(QPen(sweep_color, 1.4))
         p.drawLine(QPointF(cx, cy), line_end)
 
         # blips
@@ -645,7 +660,8 @@ class RadarWidget(QWidget):
 
         # center
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(34, 211, 238, 55))
+        center_glow = QColor(P.accent); center_glow.setAlpha(55)
+        p.setBrush(center_glow)
         p.drawEllipse(QPointF(cx, cy), 7, 7)
         p.setBrush(QColor(P.accent))
         p.drawEllipse(QPointF(cx, cy), 3, 3)
@@ -683,7 +699,7 @@ class ProgressBar(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         track = QRectF(0, 0, self.width(), self.height())
-        p.setBrush(QColor("#18243A"))
+        p.setBrush(QColor(P.track))
         p.setPen(Qt.PenStyle.NoPen)
         p.drawRoundedRect(track, self.height() / 2, self.height() / 2)
         if self._value > 0:
@@ -729,7 +745,7 @@ class EmptyState(QWidget):
         row.addStretch(1)
         self.scan_btn = QPushButton("Сканировать", self)
         self.scan_btn.setProperty("variant", "primary")
-        self.scan_btn.setIcon(icon("scan", "#06121C", 17))
+        self.scan_btn.setIcon(icon("scan", P.primary_text, 17))
         self.scan_btn.setIconSize(QSize(17, 17))
         self.scan_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.scan_btn.clicked.connect(self.scan_clicked.emit)
@@ -752,6 +768,15 @@ class EmptyState(QWidget):
     def set_devices(self, devices: Iterable[Device]) -> None:
         self.radar.set_devices(devices)
 
+    def refresh_theme(self) -> None:
+        self.subtitle.setStyleSheet(f"color: {P.muted}; font-size: 12.5px;")
+        self.reset_btn.setStyleSheet("")
+        self.progress.update()
+        if self._mode == "scanning":
+            self.scan_btn.setIcon(icon("stop", P.primary_text, 14))
+        else:
+            self.scan_btn.setIcon(icon("scan", P.primary_text, 17))
+
     def show_idle(self, count: int, range_text: str) -> None:
         self._mode = "idle"
         self.radar.setVisible(True)
@@ -765,7 +790,7 @@ class EmptyState(QWidget):
         self.reset_btn.setVisible(False)
         self.settings_btn.setVisible(True)
         self.scan_btn.setText("Сканировать")
-        self.scan_btn.setIcon(icon("scan", "#06121C", 17))
+        self.scan_btn.setIcon(icon("scan", P.primary_text, 17))
 
     def show_scanning(self) -> None:
         self._mode = "scanning"
@@ -776,7 +801,7 @@ class EmptyState(QWidget):
         self.subtitle.setText("Ищем устройства и открытые сервисы…")
         self.scan_btn.setVisible(True)
         self.scan_btn.setText("Остановить")
-        self.scan_btn.setIcon(icon("stop", "#06121C", 14))
+        self.scan_btn.setIcon(icon("stop", P.primary_text, 14))
         self.reset_btn.setVisible(False)
         self.settings_btn.setVisible(False)
 
@@ -792,7 +817,7 @@ class EmptyState(QWidget):
         self.subtitle.setText("Попробуйте изменить фильтр или поисковый запрос" if searching else "В этом диапазоне нет отвечающих устройств")
         self.scan_btn.setVisible(True)
         self.scan_btn.setText("Сканировать снова")
-        self.scan_btn.setIcon(icon("refresh", "#06121C", 16))
+        self.scan_btn.setIcon(icon("refresh", P.primary_text, 16))
         self.reset_btn.setVisible(True)
         self.settings_btn.setVisible(False)
 
@@ -829,9 +854,9 @@ class ServiceChip(QAbstractButton):
         color = service_color(self.service.kind)
         c = QColor(color)
         bg = QColor(c)
-        bg.setAlpha(20 if self._hover else 12)
+        bg.setAlpha(22 if self._hover else 14)
         border = QColor(c)
-        border.setAlpha(65 if self._hover else 32)
+        border.setAlpha(70 if self._hover else 36)
         p.setBrush(bg)
         p.setPen(QPen(border, 1))
         p.drawRoundedRect(rect, 8, 8)
@@ -843,7 +868,8 @@ class ServiceChip(QAbstractButton):
         }.get(self.service.kind, "signal")
         p.drawPixmap(QRect(9, 9, 16, 16), pixmap(icon_name, color, 16))
         p.setFont(font(10.8, QFont.Weight.DemiBold))
-        p.setPen(QColor(color).lighter(125))
+        ink = QColor(color)
+        p.setPen(ink.darker(112) if P.mode == "light" else ink.lighter(125))
         fm = QFontMetrics(p.font())
         text = fm.elidedText(self.service.name, Qt.TextElideMode.ElideRight, max(20, self.width() - 37))
         p.drawText(QRectF(31, 0, self.width() - 36, self.height()), Qt.AlignmentFlag.AlignVCenter, text)
@@ -875,8 +901,8 @@ class ServiceTile(QAbstractButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         rect = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        p.setBrush(QColor("#101B2E" if self._hover else "#0C1524"))
-        p.setPen(QPen(QColor("#263A58" if self._hover else P.border_soft), 1))
+        p.setBrush(QColor(P.overlay_hover if self._hover else P.overlay_bg))
+        p.setPen(QPen(QColor(P.border_hover if self._hover else P.border_soft), 1))
         p.drawRoundedRect(rect, 10, 10)
         color = service_color(self.service.kind)
         tile = QRectF(9, 9, 30, 30)
@@ -915,7 +941,7 @@ class Toast(QFrame):
         self.setGraphicsEffect(self._effect)
         self._effect.setOpacity(0.0)
         self._label = QLabel("", self)
-        self._label.setStyleSheet("color: #DDE9F8; font-size: 12.5px;")
+        self._label.setStyleSheet(f"color: {P.text_soft}; font-size: 12.5px;")
         self._icon = QLabel("", self)
         self._icon.setFixedSize(18, 18)
         layout = QHBoxLayout(self)
@@ -924,14 +950,21 @@ class Toast(QFrame):
         layout.addWidget(self._icon)
         layout.addWidget(self._label)
         self.setStyleSheet(
-            "QFrame#Toast { background: rgba(15, 25, 42, 0.97);"
-            " border: 1px solid #2B3F5D; border-radius: 12px; }"
+            f"QFrame#Toast {{ background: {rgba(P.toast_bg, 0.97)};"
+            f" border: 1px solid {P.toast_border}; border-radius: 12px; }}"
         )
         self._anim = QPropertyAnimation(self._effect, b"opacity", self)
         self._anim.setDuration(170)
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._hide)
+
+    def refresh_theme(self) -> None:
+        self._label.setStyleSheet(f"color: {P.text_soft}; font-size: 12.5px;")
+        self.setStyleSheet(
+            f"QFrame#Toast {{ background: {rgba(P.toast_bg, 0.97)};"
+            f" border: 1px solid {P.toast_border}; border-radius: 12px; }}"
+        )
 
     def show_message(self, text: str, kind: str = "ok") -> None:
         color = {"ok": P.green, "error": P.red, "info": P.accent}.get(kind, P.accent)

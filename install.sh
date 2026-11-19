@@ -26,4 +26,8 @@ ln -sf "$DEST/run.sh" "$BIN/scanero"
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS" || true
 command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor" >/dev/null 2>&1 || true
 
+if ! command -v xdotool >/dev/null 2>&1; then
+  echo "Подсказка: для автоматического фокуса внешних окон установите xdotool:"
+  echo "  sudo apt install xdotool"
+fi
 echo "Готово. Запускайте: scanero   (или через меню приложений — Scanero IP Сканер)"

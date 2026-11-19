@@ -378,18 +378,21 @@ class DeviceDelegate(QStyledItemDelegate):
         hovered = self.tree.hovered_row == option.rect.top()
         bg = QRectF(row_rect.adjusted(4, 2, -4, -2))
         if selected:
-            painter.setBrush(QColor(34, 211, 238, 22))
-            painter.setPen(QPen(QColor(34, 211, 238, 42), 1))
+            sel = QColor(P.accent); sel.setAlpha(24)
+            sel_border = QColor(P.accent); sel_border.setAlpha(48)
+            painter.setBrush(sel)
+            painter.setPen(QPen(sel_border, 1))
             painter.drawRoundedRect(bg, 10, 10)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QColor(P.accent))
             painter.drawRoundedRect(QRectF(7, bg.top() + (bg.height() - 22) / 2, 3, 22), 1.5, 1.5)
         elif hovered:
-            painter.setBrush(QColor(255, 255, 255, 7))
+            hover = QColor(P.hover_rgb); hover.setAlpha(9)
+            painter.setBrush(hover)
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(bg, 10, 10)
         if is_child:
-            painter.setPen(QPen(QColor(38, 56, 84), 1))
+            painter.setPen(QPen(QColor(P.border_soft), 1))
             x = option.rect.left() + 19
             painter.drawLine(QPoint(x, row_rect.top()), QPoint(x, row_rect.bottom()))
 
@@ -500,7 +503,7 @@ class DeviceDelegate(QStyledItemDelegate):
         painter.setBrush(c)
         painter.drawEllipse(QPointF(pill.left() + 10, rect.center().y()), 2.8, 2.8)
         painter.setFont(self.f_pill)
-        painter.setPen(c.lighter(112))
+        painter.setPen(c.darker(112) if P.mode == "light" else c.lighter(112))
         painter.drawText(
             QRectF(pill.left() + 17, pill.top(), pill.width() - 20, pill.height()),
             int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
@@ -536,7 +539,7 @@ class DeviceDelegate(QStyledItemDelegate):
             painter.setPen(QPen(border, 1))
             painter.drawRoundedRect(chip, 6, 6)
             painter.setFont(self.f_chip)
-            painter.setPen(c.lighter(120))
+            painter.setPen(c.darker(112) if P.mode == "light" else c.lighter(120))
             painter.drawText(chip, int(Qt.AlignmentFlag.AlignCenter), label)
             x += width + 4
             shown += 1
@@ -546,7 +549,8 @@ class DeviceDelegate(QStyledItemDelegate):
             fm = QFontMetrics(self.f_chip)
             width = fm.horizontalAdvance(label) + 10
             if x + width <= max_x:
-                painter.setBrush(QColor(255, 255, 255, 10))
+                remaining_bg = QColor(P.hover_rgb); remaining_bg.setAlpha(14)
+                painter.setBrush(remaining_bg)
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.drawRoundedRect(QRectF(x, rect.center().y() - 9, width, 18), 6, 6)
                 painter.setFont(self.f_chip)

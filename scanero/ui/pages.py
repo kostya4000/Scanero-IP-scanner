@@ -34,7 +34,7 @@ from .table import (
     DeviceTree,
     favorite_key,
 )
-from .theme import P, kind_color, service_color
+from .theme import P, kind_color, rgba, service_color
 from .widgets import (
     Avatar,
     EmptyState,
@@ -195,8 +195,9 @@ class InspectorPanel(QFrame):
         empty_layout.addWidget(empty_hint)
         empty_layout.addSpacing(10)
         net_card = QFrame()
+        net_card.setObjectName("NetCard")
         net_card.setStyleSheet(
-            "QFrame { background:#0C1524; border:1px solid #162136; border-radius:12px; }"
+            f"QFrame#NetCard {{ background:{P.input_bg}; border:1px solid {P.border_soft}; border-radius:12px; }}"
         )
         nc = QVBoxLayout(net_card)
         nc.setContentsMargins(14, 12, 14, 12)
@@ -211,6 +212,7 @@ class InspectorPanel(QFrame):
         self.empty_range = QLabel("")
         self.empty_range.setStyleSheet(f"color:{P.dim}; font-size:11px;")
         nc.addWidget(self.empty_range)
+        self.net_card = net_card
         empty_layout.addWidget(net_card)
         empty_layout.addStretch(1)
         self.stack.addWidget(self.empty)
@@ -249,7 +251,7 @@ class InspectorPanel(QFrame):
         self.open_btn = QPushButton("Открыть")
         self.open_btn.setProperty("variant", "soft")
         self.open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.open_btn.setIcon(icon("arrow-up-right", "#8CE8F7", 16))
+        self.open_btn.setIcon(icon("arrow-up-right", P.accent_soft, 16))
         self.open_btn.setIconSize(QSize(16, 16))
         self.open_btn.setFixedHeight(34)
         self.open_btn.clicked.connect(lambda: self._emit_action("open_primary"))
@@ -261,6 +263,7 @@ class InspectorPanel(QFrame):
         self.actions_grid.setContentsMargins(0, 2, 0, 0)
         self.actions_grid.setSpacing(6)
         self.action_buttons: dict[str, QPushButton] = {}
+        self.action_icon_colors: dict[str, str] = {}
         actions = [
             ("smb", "Файлы", "folder", P.amber, "Общие папки (SMB)"),
             ("http", "Веб", "globe", P.accent, "Веб-интерфейс"),
@@ -281,6 +284,7 @@ class InspectorPanel(QFrame):
             btn.clicked.connect(lambda _=False, a=action: self._emit_action(a))
             self.actions_grid.addWidget(btn, idx // 2, idx % 2)
             self.action_buttons[action] = btn
+            self.action_icon_colors[action] = color
         self.dv.addLayout(self.actions_grid)
         self.dv.addSpacing(4)
 
@@ -288,7 +292,7 @@ class InspectorPanel(QFrame):
         services_head.addWidget(_section_label("Сервисы"))
         self.services_count = QLabel("0")
         self.services_count.setStyleSheet(
-            f"color:{P.accent}; background:rgba(34,211,238,.08); border-radius:6px; "
+            f"color:{P.accent}; background:{rgba(P.accent, 0.08)}; border-radius:6px; "
             "padding:1px 6px; font-size:10px; font-weight:600;"
         )
         services_head.addWidget(self.services_count)
@@ -329,6 +333,30 @@ class InspectorPanel(QFrame):
         self.dv.addStretch(1)
         self.stack.setCurrentIndex(0)
 
+    def refresh_theme(self) -> None:
+        self.star.setIcon(icon(
+            "star-fill" if self._favorite else "star",
+            P.amber if self._favorite else P.dim, 17,
+        ))
+        self.open_btn.setIcon(icon("arrow-up-right", P.accent_soft, 16))
+        self.net_card.setStyleSheet(
+            f"QFrame#NetCard {{ background:{P.input_bg}; border:1px solid {P.border_soft}; border-radius:12px; }}"
+        )
+        for action, color in self.action_icon_colors.items():
+            button = self.action_buttons[action]
+            old = button.icon()
+            name = {
+                "smb": "folder", "http": "globe", "rdp": "monitor", "ssh": "terminal",
+                "wol": "power", "ping": "activity", "copy": "copy", "shutdown": "power",
+            }.get(action, "signal")
+            button.setIcon(icon(name, color, 15))
+        if self.device is not None:
+            self.pill.set_status(self.device.status)
+        for label in self.info_values.values():
+            label.setStyleSheet(f"color:{P.text_soft}; font-size:11.5px;")
+        self.avatar.update()
+        self.mini_radar.update()
+
     def _emit_action(self, action: str) -> None:
         if self.device is not None:
             self.action_requested.emit(action, self.device)
@@ -360,8 +388,6 @@ class InspectorPanel(QFrame):
         self.mini_radar.set_devices([])
 
     def update_device(self, device: Device, favorite: bool | None = None) -> None:
-        if self.device is not None and self.device.ip != device.ip:
-            return
         if device is None:
             self.clear()
             return
@@ -473,11 +499,12 @@ class ScannerPage(QWidget):
         cp.setContentsMargins(12, 10, 10, 10)
         cp.setSpacing(10)
         target_tile = QLabel()
+        self.target_tile = target_tile
         target_tile.setFixedSize(38, 38)
         target_tile.setAlignment(Qt.AlignmentFlag.AlignCenter)
         target_tile.setPixmap(pixmap("target", P.accent, 20))
         target_tile.setStyleSheet(
-            "background: rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.18); border-radius:10px;"
+            f"background: {rgba(P.accent, 0.08)}; border:1px solid {rgba(P.accent, 0.18)}; border-radius:10px;"
         )
         cp.addWidget(target_tile)
         self.range_edit = QLineEdit()
@@ -498,7 +525,7 @@ class ScannerPage(QWidget):
         cp.addWidget(self.network_btn)
         self.scan_btn = QPushButton("Сканировать")
         self.scan_btn.setProperty("variant", "primary")
-        self.scan_btn.setIcon(icon("scan", "#06121C", 17))
+        self.scan_btn.setIcon(icon("scan", P.primary_text, 17))
         self.scan_btn.setIconSize(QSize(17, 17))
         self.scan_btn.setFixedHeight(42)
         self.scan_btn.setMinimumWidth(166)
@@ -648,7 +675,7 @@ class ScannerPage(QWidget):
     def set_scanning(self, running: bool) -> None:
         self._scanning = running
         self.scan_btn.setText("Остановить" if running else "Сканировать")
-        self.scan_btn.setIcon(icon("stop" if running else "scan", "#06121C", 15 if running else 17))
+        self.scan_btn.setIcon(icon("stop" if running else "scan", P.primary_text, 15 if running else 17))
         self.range_edit.setEnabled(not running)
         self.network_btn.setEnabled(not running)
         self.progress.setVisible(running)
@@ -851,6 +878,25 @@ class ScannerPage(QWidget):
             self.footer_info.setText("")
         self._update_idle_text()
 
+    def refresh_theme(self) -> None:
+        self.target_tile.setPixmap(pixmap("target", P.accent, 20))
+        self.target_tile.setStyleSheet(
+            f"background: {rgba(P.accent, 0.08)}; border:1px solid {rgba(P.accent, 0.18)}; border-radius:10px;"
+        )
+        self.network_btn.setIcon(icon("wifi", P.muted, 16))
+        self.export_btn.setIcon(icon("download", P.muted, 17))
+        self.scan_btn.setIcon(
+            icon("stop" if self._scanning else "scan", P.primary_text, 15 if self._scanning else 17)
+        )
+        self.stat_online.set_color(P.green)
+        self.stat_services.set_color(P.accent2)
+        self.stat_offline.set_color(P.red)
+        self.stat_time.set_color(P.accent)
+        self.empty.refresh_theme()
+        self.inspector.refresh_theme()
+        self.tree.viewport().update()
+        self.update()
+
     def update_favorite(self, device: Device, favorite: bool) -> None:
         device.favorite = favorite
         keys = {f.key for f in self.favorite_items} | {f.ip for f in self.favorite_items}
@@ -988,8 +1034,10 @@ class FavoriteCard(QFrame):
         self.favorite = favorite
         self.setObjectName("FavoriteCard")
         self.setStyleSheet(
-            "QFrame#FavoriteCard { background: rgba(15,24,41,.78); border:1px solid #162136; "
-            "border-radius:14px; } QFrame#FavoriteCard:hover { border-color:#243652; background:#111B2E; }"
+            f"QFrame#FavoriteCard {{ background: {rgba(P.card, 0.92)};"
+            f" border:1px solid {P.border_soft}; border-radius:14px; }}"
+            f"QFrame#FavoriteCard:hover {{ border-color:{P.border_hover};"
+            f" background:{P.card_hover}; }}"
         )
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 13, 14, 13)
@@ -1025,7 +1073,7 @@ class FavoriteCard(QFrame):
         layout.addWidget(last)
         scan = QPushButton("Сканировать")
         scan.setProperty("variant", "soft")
-        scan.setIcon(icon("play", "#8CE8F7", 14))
+        scan.setIcon(icon("play", P.accent_soft, 14))
         scan.setIconSize(QSize(14, 14))
         scan.setFixedHeight(32)
         scan.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1060,7 +1108,7 @@ class FavoritesPage(QWidget):
         action_row.addStretch(1)
         self.scan_all_btn = QPushButton("Сканировать избранное")
         self.scan_all_btn.setProperty("variant", "primary")
-        self.scan_all_btn.setIcon(icon("radar", "#06121C", 16))
+        self.scan_all_btn.setIcon(icon("radar", P.primary_text, 16))
         self.scan_all_btn.setIconSize(QSize(16, 16))
         self.scan_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.scan_all_btn.clicked.connect(self._scan_all)
@@ -1079,6 +1127,7 @@ class FavoritesPage(QWidget):
         ev.setContentsMargins(0, 60, 0, 0)
         ev.setSpacing(8)
         star_icon = QLabel()
+        self.empty_icon = star_icon
         star_icon.setPixmap(icon("star", P.amber, 46).pixmap(46, 46))
         star_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ev.addWidget(star_icon)
@@ -1114,6 +1163,10 @@ class FavoritesPage(QWidget):
         )
         self.scan_all_btn.setEnabled(bool(favorites))
 
+    def refresh_theme(self) -> None:
+        self.empty_icon.setPixmap(icon("star", P.amber, 46).pixmap(46, 46))
+        self.refresh(self.favorites)
+
     def _scan_all(self) -> None:
         if self.favorites:
             self.scan_all.emit(", ".join(f.ip for f in self.favorites if f.ip))
@@ -1130,9 +1183,10 @@ class HistoryCard(QFrame):
     def __init__(self, entry: HistoryEntry, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.entry = entry
+        self.setObjectName("HistoryCard")
         self.setStyleSheet(
-            "QFrame { background: rgba(15,24,41,.78); border:1px solid #162136; border-radius:14px; }"
-            "QFrame:hover { border-color:#243652; }"
+            f"QFrame#HistoryCard {{ background: {rgba(P.card, 0.92)}; border:1px solid {P.border_soft};"
+            f" border-radius:14px; }} QFrame#HistoryCard:hover {{ border-color:{P.border_hover}; }}"
         )
         layout = QHBoxLayout(self)
         layout.setContentsMargins(16, 12, 14, 12)
@@ -1141,7 +1195,7 @@ class HistoryCard(QFrame):
         icon_label.setFixedSize(38, 38)
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setStyleSheet(
-            "background: rgba(34,211,238,.07); border:1px solid rgba(34,211,238,.15); border-radius:10px;"
+            f"background: {rgba(P.accent, 0.07)}; border:1px solid {rgba(P.accent, 0.15)}; border-radius:10px;"
         )
         icon_label.setPixmap(pixmap("history", P.accent, 19))
         layout.addWidget(icon_label)
@@ -1163,7 +1217,7 @@ class HistoryCard(QFrame):
         ):
             chip = QLabel(text)
             chip.setStyleSheet(
-                f"color:{color}; background: rgba(255,255,255,.035); border:1px solid #1B2940;"
+                f"color:{color}; background: {rgba(P.hover_rgb, 0.035)}; border:1px solid {P.border};"
                 "border-radius:7px; padding:3px 8px; font-size:10.5px;"
             )
             chips.addWidget(chip)
@@ -1171,7 +1225,7 @@ class HistoryCard(QFrame):
         open_btn = QPushButton("Открыть")
         open_btn.setProperty("variant", "soft")
         open_btn.setFixedHeight(32)
-        open_btn.setIcon(icon("eye", "#8CE8F7", 14))
+        open_btn.setIcon(icon("eye", P.accent_soft, 14))
         open_btn.setIconSize(QSize(14, 14))
         open_btn.clicked.connect(lambda: self.open_clicked.emit(self.entry))
         layout.addWidget(open_btn)
@@ -1211,6 +1265,7 @@ class HistoryPage(QWidget):
         ev.setContentsMargins(0, 70, 0, 0)
         ev.setSpacing(10)
         ic = QLabel()
+        self.empty_icon = ic
         ic.setPixmap(icon("history", P.dim, 44).pixmap(44, 44))
         ic.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ev.addWidget(ic)
@@ -1226,6 +1281,10 @@ class HistoryPage(QWidget):
         self.scroll.setWidget(self.container)
         root.addWidget(self.scroll, 1)
         self.refresh(entries)
+
+    def refresh_theme(self) -> None:
+        self.empty_icon.setPixmap(icon("history", P.dim, 44).pixmap(44, 44))
+        self.refresh(self.entries)
 
     def refresh(self, entries: list[HistoryEntry]) -> None:
         self.entries = entries
@@ -1253,6 +1312,7 @@ class SettingsPage(QWidget):
     import_favorites = pyqtSignal()
     clear_history = pyqtSignal()
     about_requested = pyqtSignal()
+    repository_requested = pyqtSignal()
     reset_requested = pyqtSignal()
 
     def __init__(self, settings: Settings, parent: QWidget | None = None) -> None:
@@ -1271,8 +1331,33 @@ class SettingsPage(QWidget):
         self.layout = QVBoxLayout(content)
         self.layout.setContentsMargins(0, 0, 6, 4)
         self.layout.setSpacing(12)
+        self.scroll = scroll
         scroll.setWidget(content)
         root.addWidget(scroll, 1)
+
+        # appearance
+        card, cl = _settings_card("Оформление", "Светлая, тёмная или системная тема интерфейса.")
+        theme_box = QWidget()
+        tb = QHBoxLayout(theme_box)
+        tb.setContentsMargins(0, 0, 0, 0)
+        tb.setSpacing(5)
+        self.theme_group = QButtonGroup(self)
+        self.theme_group.setExclusive(True)
+        self.theme_buttons: dict[str, QPushButton] = {}
+        for mode, label in (("system", "Системная"), ("dark", "Тёмная"), ("light", "Светлая")):
+            btn = QPushButton(label)
+            btn.setProperty("chip", "true")
+            btn.setProperty("themeMode", mode)
+            btn.setCheckable(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(30)
+            btn.clicked.connect(lambda _=False, m=mode: self._theme_changed(m))
+            self.theme_group.addButton(btn)
+            self.theme_buttons[mode] = btn
+            tb.addWidget(btn)
+        cl.addWidget(_setting_row("Тема оформления", "Системная подстраивается под оформление Ubuntu.", theme_box))
+        cl.addWidget(hline())
+        self.layout.addWidget(card)
 
         # performance
         card, cl = _settings_card("Производительность", "Баланс между скоростью и нагрузкой на сеть и процессор.")
@@ -1316,7 +1401,15 @@ class SettingsPage(QWidget):
         cl.addWidget(hline())
         self.toggle_mdns = ToggleSwitch()
         self.toggle_mdns.toggled.connect(lambda v: self._emit("use_mdns", v))
-        cl.addWidget(_setting_row("mDNS / Avahi", "Искать локальные имена вида device.local.", self.toggle_mdns))
+        cl.addWidget(_setting_row("mDNS / Avahi", "Имена из локальных сервисов, AirPlay, принтеров и NAS.", self.toggle_mdns))
+        cl.addWidget(hline())
+        self.toggle_ssdp = ToggleSwitch()
+        self.toggle_ssdp.toggled.connect(lambda v: self._emit("use_ssdp", v))
+        cl.addWidget(_setting_row("SSDP / UPnP", "Дружественные имена телевизоров, роутеров и медиаустройств.", self.toggle_ssdp))
+        cl.addWidget(hline())
+        self.toggle_snmp = ToggleSwitch()
+        self.toggle_snmp.toggled.connect(lambda v: self._emit("use_snmp", v))
+        cl.addWidget(_setting_row("SNMP sysName", "Читать имя сетевого оборудования и принтеров (community public).", self.toggle_snmp))
         cl.addWidget(hline())
         ports_box = QWidget()
         pb = QVBoxLayout(ports_box)
@@ -1377,6 +1470,12 @@ class SettingsPage(QWidget):
         ver.setStyleSheet(f"color:{P.muted}; font-size:11.5px;")
         ar.addWidget(ver)
         ar.addStretch(1)
+        repo = QPushButton("Репозиторий")
+        repo.setProperty("variant", "ghost")
+        repo.setIcon(icon("external", P.muted, 14))
+        repo.setCursor(Qt.CursorShape.PointingHandCursor)
+        repo.clicked.connect(self.repository_requested.emit)
+        ar.addWidget(repo)
         about = QPushButton("Подробнее")
         about.setIcon(icon("info", P.muted, 15))
         about.clicked.connect(self.about_requested.emit)
@@ -1398,6 +1497,13 @@ class SettingsPage(QWidget):
     def _ports_changed(self) -> None:
         self._emit("ports", self.ports.text().strip())
 
+    def _theme_changed(self, mode: str) -> None:
+        self._emit("theme", mode)
+
+    def refresh_theme(self) -> None:
+        self.refresh_from_settings()
+        self.update()
+
     def refresh_from_settings(self) -> None:
         self._loading = True
         try:
@@ -1408,7 +1514,12 @@ class SettingsPage(QWidget):
             self.toggle_names.setChecked(bool(self.settings.get("resolve_names", True)))
             self.toggle_netbios.setChecked(bool(self.settings.get("use_netbios", True)))
             self.toggle_mdns.setChecked(bool(self.settings.get("use_mdns", True)))
+            self.toggle_ssdp.setChecked(bool(self.settings.get("use_ssdp", True)))
+            self.toggle_snmp.setChecked(bool(self.settings.get("use_snmp", True)))
             self.toggle_notify.setChecked(bool(self.settings.get("notify", True)))
+            theme = str(self.settings.get("theme", "system"))
+            for mode, button in self.theme_buttons.items():
+                button.setChecked(mode == theme)
             self.ports.setText(str(self.settings.get("ports", "")))
             self.ports.setCursorPosition(0)
         finally:

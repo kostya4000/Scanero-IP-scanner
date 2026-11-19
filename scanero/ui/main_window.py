@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import re
 import time
+from dataclasses import fields
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
@@ -32,11 +34,12 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from .. import __version__
+from .. import __version__, REPO_URL
 from ..core.actions import (
     copy_text,
     device_as_text,
     notify,
+    open_external_url,
     open_rdp,
     open_service,
     open_terminal,
@@ -59,7 +62,7 @@ from ..core.storage import HistoryEntry, SPEED_MAP, Settings, FavoritesStore, Hi
 from .dialogs import AboutDialog, ShutdownDialog
 from .icons import icon, pixmap
 from .pages import FavoritesPage, HistoryPage, ScannerPage, SettingsPage
-from .theme import P, qss
+from .theme import P, qss, rgba, set_theme
 from .widgets import IconButton, LogoWidget, NavButton, NetworkCard, Toast, font, plural
 from .worker import ScanWorker
 
@@ -87,26 +90,32 @@ class RootFrame(QWidget):
         p.setClipPath(path)
 
         grad = QLinearGradient(0, 0, 0, self.height())
-        grad.setColorAt(0.0, QColor("#070B13"))
-        grad.setColorAt(0.5, QColor("#080D18"))
-        grad.setColorAt(1.0, QColor("#0B1120"))
+        grad.setColorAt(0.0, QColor(P.bg_top))
+        grad.setColorAt(0.5, QColor(P.bg_top))
+        grad.setColorAt(1.0, QColor(P.bg_bottom))
         p.fillPath(path, grad)
 
         glow1 = QRadialGradient(self.width() * 0.88, 40, max(300, self.width() * 0.55))
-        glow1.setColorAt(0.0, QColor(34, 211, 238, 24))
-        glow1.setColorAt(0.55, QColor(34, 211, 238, 6))
-        glow1.setColorAt(1.0, QColor(34, 211, 238, 0))
+        g1 = QColor(P.glow1); g1.setAlpha(24)
+        g1b = QColor(P.glow1); g1b.setAlpha(6)
+        g1c = QColor(P.glow1); g1c.setAlpha(0)
+        glow1.setColorAt(0.0, g1)
+        glow1.setColorAt(0.55, g1b)
+        glow1.setColorAt(1.0, g1c)
         p.fillRect(self.rect(), glow1)
 
         glow2 = QRadialGradient(self.width() * 0.05, self.height() * 0.98, max(280, self.width() * 0.42))
-        glow2.setColorAt(0.0, QColor(139, 140, 255, 18))
-        glow2.setColorAt(0.55, QColor(139, 140, 255, 5))
-        glow2.setColorAt(1.0, QColor(139, 140, 255, 0))
+        g2 = QColor(P.glow2); g2.setAlpha(18)
+        g2b = QColor(P.glow2); g2b.setAlpha(5)
+        g2c = QColor(P.glow2); g2c.setAlpha(0)
+        glow2.setColorAt(0.0, g2)
+        glow2.setColorAt(0.55, g2b)
+        glow2.setColorAt(1.0, g2c)
         p.fillRect(self.rect(), glow2)
 
         p.setClipping(False)
-        border = QColor("#22334E")
-        border.setAlpha(180)
+        border = QColor(P.root_border)
+        border.setAlpha(200)
         p.setPen(border)
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawRoundedRect(rect, radius, radius)
@@ -141,8 +150,9 @@ class TitleBar(QFrame):
         version.setFixedHeight(20)
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         version.setStyleSheet(
-            "color:#6EE7F7; background:rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.16);"
-            "border-radius:6px; padding:0 7px; font-size:9.5px; font-weight:600;"
+            f"color:{P.accent_soft}; background:{rgba(P.accent, 0.08)};"
+            f"border:1px solid {rgba(P.accent, 0.16)}; border-radius:6px;"
+            "padding:0 7px; font-size:9.5px; font-weight:600;"
         )
         layout.addWidget(version, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addStretch(1)
@@ -162,16 +172,21 @@ class TitleBar(QFrame):
         btn.setProperty("variant", "close" if close else "window")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFixedSize(32, 32)
-        btn.setIcon(icon(icon_name, P.muted if not close else "#D6A4AA", 16))
+        btn.setIcon(icon(icon_name, P.muted if not close else P.close_icon, 16))
         btn.setIconSize(QSize(16, 16))
         btn.setToolTip(tip)
         if close:
-            btn.setIcon(icon(icon_name, "#EDB5BC", 16))
+            btn.setIcon(icon(icon_name, P.close_icon, 16))
         return btn
 
     def set_maximized(self, value: bool) -> None:
         self.btn_max.setIcon(icon("restore" if value else "square", P.muted, 15))
         self.btn_max.setToolTip("Восстановить" if value else "Развернуть")
+
+    def refresh_theme(self) -> None:
+        self.btn_min.setIcon(icon("minus", P.muted, 16))
+        self.btn_max.setIcon(icon("restore" if self.window().isMaximized() else "square", P.muted, 15))
+        self.btn_close.setIcon(icon("x", P.close_icon, 16))
 
     def mousePressEvent(self, event) -> None:  # noqa: N802
         if event.button() == Qt.MouseButton.LeftButton:
@@ -256,6 +271,12 @@ class MainWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.settings = Settings()
+        self._theme_pref = str(self.settings.get("theme", "system"))
+        self._resolved_theme = set_theme(self._theme_pref)
+        self._applying_theme = False
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(qss())
         self.favorites = FavoritesStore()
         self.history = HistoryStore()
         self.interfaces: list[Interface] = []
@@ -274,7 +295,6 @@ class MainWindow(QWidget):
         self.setWindowFlags(Qt.WindowType.Window | Qt.WindowType.FramelessWindowHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setMinimumSize(1120, 700)
-        self.setStyleSheet(qss())
 
         self.root = RootFrame(self)
         outer = QVBoxLayout(self)
@@ -300,10 +320,6 @@ class MainWindow(QWidget):
         self.sidebar = QFrame()
         self.sidebar.setObjectName("Sidebar")
         self.sidebar.setFixedWidth(228)
-        self.sidebar.setStyleSheet(
-            "QFrame#Sidebar { background: rgba(9, 14, 25, 0.7); border: 1px solid #152134;"
-            " border-radius: 14px; }"
-        )
         side = QVBoxLayout(self.sidebar)
         side.setContentsMargins(12, 14, 12, 12)
         side.setSpacing(4)
@@ -334,6 +350,18 @@ class MainWindow(QWidget):
         self.nav_settings = NavButton("settings", "Настройки")
         self.nav_settings.clicked.connect(lambda: self.switch_page("settings"))
         side.addWidget(self.nav_settings)
+        self.repo_link = QLabel(
+            f'<a href="{REPO_URL}" style="color:{P.accent_soft}; text-decoration:none;">'
+            "Репозиторий на GitHub</a>"
+        )
+        self.repo_link.setTextFormat(Qt.TextFormat.RichText)
+        self.repo_link.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        self.repo_link.setOpenExternalLinks(False)
+        self.repo_link.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.repo_link.setStyleSheet(f"font-size:10.5px; padding-left:14px; color:{P.accent_soft};")
+        self.repo_link.setToolTip(REPO_URL)
+        self.repo_link.linkActivated.connect(lambda _=None: self._open_repository())
+        side.addWidget(self.repo_link)
         footer = QLabel(f"Scanero IP · {__version__}\nUbuntu Edition")
         footer.setStyleSheet(f"color:{P.dim}; font-size:9.5px; line-height:1.5;")
         footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -370,6 +398,7 @@ class MainWindow(QWidget):
         self.settings_page.import_favorites.connect(self._import_favorites)
         self.settings_page.clear_history.connect(self._clear_history)
         self.settings_page.about_requested.connect(self._show_about)
+        self.settings_page.repository_requested.connect(self._open_repository)
         self.settings_page.reset_requested.connect(self._reset_settings)
         self.history_page.open_entry.connect(self._open_history)
         self.history_page.repeat_entry.connect(self._repeat_history)
@@ -389,6 +418,14 @@ class MainWindow(QWidget):
         ]
 
         self._install_shortcuts()
+        hints = QApplication.styleHints()
+        scheme_signal = getattr(hints, "colorSchemeChanged", None)
+        if scheme_signal is not None:
+            scheme_signal.connect(self._system_scheme_changed)
+        self._theme_poll = QTimer(self)
+        self._theme_poll.setInterval(30000)
+        self._theme_poll.timeout.connect(self._poll_system_theme)
+        self._theme_poll.start()
         self._refresh_interfaces(initial=True)
         self._refresh_favorites_ui()
         self._restore_geometry()
@@ -651,6 +688,8 @@ class MainWindow(QWidget):
             resolve_names=bool(self.settings.get("resolve_names", True)),
             use_netbios=bool(self.settings.get("use_netbios", True)),
             use_mdns=bool(self.settings.get("use_mdns", True)),
+            use_ssdp=bool(self.settings.get("use_ssdp", True)),
+            use_snmp=bool(self.settings.get("use_snmp", True)),
             tcp_discovery=bool(self.settings.get("tcp_discovery", True)),
             ports=self.settings.ports,
             interfaces=self.interfaces,
@@ -970,6 +1009,9 @@ class MainWindow(QWidget):
 
     # -- settings ------------------------------------------------------------
     def _setting_changed(self, key: str, value: object) -> None:
+        if key == "theme":
+            self._apply_theme(str(value))
+            return
         if key == "speed":
             speed = SPEED_MAP.get(int(value), SPEED_MAP[3])
             self.settings.set("speed", int(value), save=False)
@@ -981,6 +1023,118 @@ class MainWindow(QWidget):
         else:
             self.settings.set(key, value, save=False)
         self._save_timer.start()
+
+    def _system_scheme_changed(self, *_args) -> None:
+        if str(self.settings.get("theme", "system")) == "system":
+            self._apply_theme("system", save=False)
+
+    def _poll_system_theme(self) -> None:
+        if str(self.settings.get("theme", "system")) != "system":
+            return
+        from .theme import detect_system_mode
+
+        if detect_system_mode() != self._resolved_theme:
+            self._apply_theme("system", save=False)
+
+    def _apply_theme(self, preference: str, *, save: bool = True) -> None:
+        if self._applying_theme:
+            return
+        self._applying_theme = True
+        old = {field.name: getattr(P, field.name) for field in fields(P)}
+        resolved = set_theme(preference)
+        self._theme_pref = preference
+        self._resolved_theme = resolved
+        if save:
+            self.settings.set("theme", preference, save=False)
+            self._save_timer.start()
+
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(qss())
+
+        hex_map: dict[str, str] = {}
+        for field in fields(P):
+            old_value = old.get(field.name)
+            new_value = getattr(P, field.name)
+            if (isinstance(old_value, str) and isinstance(new_value, str)
+                    and old_value.startswith("#") and new_value.startswith("#")):
+                hex_map[old_value.lower()] = new_value.lower()
+        hex_map.update({
+            "#6ee7f7": P.accent_soft,
+            "#1b2940": P.border,
+            "#2b3a52": P.badge_bg,
+            "#d6a4aa": P.close_icon,
+            "#edb5bc": P.close_icon,
+            "#0e1728": P.card,
+            "#18253b": P.border_soft,
+            "#233654": P.border_hover,
+            "#111b2e": P.overlay_bg,
+            "#263a58": P.border_hover,
+            "#2b3f5d": P.toast_border,
+            "#dde9f8": P.text_soft,
+            "#f2faff": P.knob,
+            "#080d18": P.bg_top,
+            "#0b1120": P.bg_bottom,
+            "#22334e": P.root_border,
+            "#06121c": P.primary_text,
+        })
+
+        rgb_map: dict[tuple[int, int, int], str] = {}
+        for old_hex, new_hex in hex_map.items():
+            value = old_hex.lstrip("#")
+            if len(value) != 6:
+                continue
+            try:
+                rgb_map[(int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))] = new_hex
+            except ValueError:
+                pass
+        # Translucent white is used for light hover overlays; in a light theme
+        # it has to become translucent dark.
+        rgb_map[(255, 255, 255)] = P.hover_rgb
+
+        def replace_rgb(match: re.Match) -> str:
+            key = (int(match.group(2)), int(match.group(3)), int(match.group(4)))
+            new_hex = rgb_map.get(key)
+            if not new_hex:
+                return match.group(0)
+            value = new_hex.lstrip("#")
+            return f"{match.group(1)}{int(value[0:2], 16)}, {int(value[2:4], 16)}, {int(value[4:6], 16)}"
+
+        def replace_hex(match: re.Match) -> str:
+            return hex_map.get(match.group(0).lower(), match.group(0))
+
+        for widget in self.findChildren(QWidget):
+            style = widget.styleSheet()
+            if not style:
+                continue
+            updated = re.sub(r"(rgba?\(\s*)(\d+)\s*,\s*(\d+)\s*,\s*(\d+)", replace_rgb, style)
+            updated = re.sub(r"#[0-9a-fA-F]{6}", replace_hex, updated)
+            if updated != style:
+                widget.setStyleSheet(updated)
+
+        for button in self.findChildren(IconButton):
+            color = getattr(button, "_color", "")
+            new_color = hex_map.get(str(color).lower())
+            if new_color:
+                button.set_color(new_color)
+
+        self.titlebar.refresh_theme()
+        self.scanner.refresh_theme()
+        self.favorites_page.refresh_theme()
+        self.history_page.refresh_theme()
+        self.settings_page.refresh_theme()
+        self.network_card.update()
+        self.toast.refresh_theme()
+        self.repo_link.setText(
+            f'<a href="{REPO_URL}" style="color:{P.dim}; text-decoration:none;">'
+            "Репозиторий на GitHub</a>"
+        )
+        self.repo_link.setStyleSheet(f"font-size:10.5px; padding-left:14px; color:{P.accent_soft};")
+        self.update()
+        self.root.update()
+        for widget in self.findChildren(QWidget):
+            widget.update()
+        self._applying_theme = False
 
     def _reset_settings(self) -> None:
         from ..core.storage import DEFAULT_SETTINGS
@@ -996,6 +1150,11 @@ class MainWindow(QWidget):
         self.settings_page.refresh_from_settings()
         self.scanner.set_filter(self.settings.get("filter", "online"))
         self.toast.show_message("Настройки сброшены", "ok")
+
+    def _open_repository(self) -> None:
+        ok, message = open_external_url(REPO_URL)
+        if not ok:
+            self.toast.show_message(message, "error")
 
     def _show_about(self) -> None:
         AboutDialog(self).exec()

@@ -14,11 +14,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ..core.actions import remote_shutdown_supported, run_remote_shutdown
+from ..core.actions import open_external_url, remote_shutdown_supported, run_remote_shutdown
 from ..core.models import Device
-from .. import __version__
+from .. import REPO_URL, __version__
 from .icons import icon
-from .theme import P
+from .theme import P, rgba
 from .widgets import LogoWidget, ToggleSwitch, font
 
 
@@ -29,7 +29,7 @@ class ShutdownDialog(QDialog):
         self.setWindowTitle("Удалённое выключение")
         self.setModal(True)
         self.setMinimumWidth(460)
-        self.setStyleSheet(f"QDialog {{ background: #0B1320; }}")
+        self.setStyleSheet(f"QDialog {{ background: {P.dialog_bg}; }}")
         self._proc = None
 
         layout = QVBoxLayout(self)
@@ -42,7 +42,9 @@ class ShutdownDialog(QDialog):
         badge.setPixmap(icon("power", P.red, 24).pixmap(24, 24))
         badge.setFixedSize(40, 40)
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        badge.setStyleSheet("background: rgba(255,107,122,.1); border:1px solid rgba(255,107,122,.25); border-radius:11px;")
+        badge.setStyleSheet(
+            f"background: {rgba(P.red, 0.1)}; border:1px solid {rgba(P.red, 0.25)}; border-radius:11px;"
+        )
         header.addWidget(badge)
         title_box = QVBoxLayout()
         title_box.setSpacing(1)
@@ -78,8 +80,9 @@ class ShutdownDialog(QDialog):
         layout.addWidget(self.password)
 
         options = QFrame()
+        options.setObjectName("ShutdownOptions")
         options.setStyleSheet(
-            "QFrame { background:#0C1524; border:1px solid #162136; border-radius:11px; }"
+            f"QFrame#ShutdownOptions {{ background:{P.input_bg}; border:1px solid {P.border_soft}; border-radius:11px; }}"
         )
         opt_layout = QVBoxLayout(options)
         opt_layout.setContentsMargins(14, 10, 14, 10)
@@ -158,7 +161,7 @@ class AboutDialog(QDialog):
         self.setWindowTitle("О программе")
         self.setModal(True)
         self.setFixedWidth(440)
-        self.setStyleSheet("QDialog { background:#0B1320; }")
+        self.setStyleSheet(f"QDialog {{ background: {P.dialog_bg}; }}")
         layout = QVBoxLayout(self)
         layout.setContentsMargins(26, 24, 26, 22)
         layout.setSpacing(12)
@@ -177,9 +180,10 @@ class AboutDialog(QDialog):
         layout.addLayout(row)
         text = QLabel(
             "Быстрый сканер локальной сети с современным интерфейсом. Находит устройства, "
-            "определяет MAC-адреса и производителей, имена NetBIOS/DNS и открытые сервисы. "
-            "Позволяет открывать общие папки, FTP, HTTP и RDP, отправлять Wake-on-LAN, "
-            "выключать компьютеры удалённо и экспортировать отчёты."
+            "определяет MAC-адреса и производителей, имена NetBIOS/DNS/mDNS/SSDP, "
+            "открытые сервисы и операционные системы. Позволяет открывать общие папки, "
+            "FTP, HTTP и RDP, отправлять Wake-on-LAN, выключать компьютеры удалённо, "
+            "работать в тёмной или светлой теме и экспортировать отчёты."
         )
         text.setWordWrap(True)
         text.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
@@ -190,6 +194,12 @@ class AboutDialog(QDialog):
         made.setStyleSheet(f"color:{P.dim}; font-size:11px;")
         layout.addWidget(made)
         buttons = QHBoxLayout()
+        repo = QPushButton("Репозиторий на GitHub")
+        repo.setProperty("variant", "ghost")
+        repo.setIcon(icon("external", P.muted, 15))
+        repo.setCursor(Qt.CursorShape.PointingHandCursor)
+        repo.clicked.connect(lambda: open_external_url(REPO_URL))
+        buttons.addWidget(repo)
         buttons.addStretch(1)
         close = QPushButton("Закрыть")
         close.clicked.connect(self.accept)

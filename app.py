@@ -186,6 +186,10 @@ def main(argv: list[str] | None = None) -> int:
         window.network_card.set_interface(demo_iface)
         window.scanner.set_interface(demo_iface, [demo_iface])
         window.scanner.range_edit.setText("192.168.1.0/24")
+        if "--theme" in argv:
+            idx_theme = argv.index("--theme")
+            if idx_theme + 1 < len(argv):
+                window._apply_theme(argv[idx_theme + 1], save=False)
         if "--page" in argv:
             idx_page = argv.index("--page")
             if idx_page + 1 < len(argv):

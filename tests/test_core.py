@@ -168,3 +168,17 @@ class StorageTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DiscoveryTests(unittest.TestCase):
+    def test_avahi_escaping(self):
+        from scanero.core.discovery import _clean_name, _split_avahi
+
+        line = "=;eth0;IPv4;Living\\032Room\\032TV;_airplay._tcp;local;tv.local;192.168.1.5;7000;"
+        fields = _split_avahi(line)
+        self.assertEqual(_clean_name(fields[3]), "Living Room TV")
+
+    def test_snmp_oid_encoding(self):
+        from scanero.core.probe import _ber_oid
+
+        self.assertEqual(_ber_oid("1.3.6.1.2.1.1.5.0").hex(), "2b06010201010500")
