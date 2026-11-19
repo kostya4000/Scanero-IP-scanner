@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+docs/*.local.png
+*.csv
+*.json
+!scanero.desktop.in
