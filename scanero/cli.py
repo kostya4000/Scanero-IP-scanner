@@ -9,6 +9,7 @@ from .core.exporter import export
 from .core.models import STATUS_ONLINE
 from .core.netinfo import best_interface, list_interfaces, parse_targets, _plural
 from .core.scanner import DEFAULT_PORTS, ScanOptions, scan_network
+from . import __version__
 from .core.storage import Settings
 
 
@@ -26,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--csv", metavar="FILE", help="сохранить отчёт CSV")
     parser.add_argument("--html", metavar="FILE", help="сохранить отчёт HTML")
     parser.add_argument("--all", action="store_true", help="показать и выключенные адреса")
-    parser.add_argument("--version", action="version", version="Scanero IP scanner 1.0.0")
+    parser.add_argument("--version", action="version", version=f"Scanero IP scanner {__version__}")
     args = parser.parse_args(argv)
 
     ifaces = list_interfaces()

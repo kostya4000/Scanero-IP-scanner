@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from .. import __version__
 from ..core.models import Device, Favorite, Service, kind_label
 from ..core.netinfo import Interface, describe_targets, list_interfaces, parse_targets
 from ..core.storage import HistoryEntry, Settings
@@ -249,11 +250,13 @@ class InspectorPanel(QFrame):
         self.dv.addLayout(top)
 
         self.open_btn = QPushButton("Открыть")
-        self.open_btn.setProperty("variant", "soft")
+        self.open_btn.setProperty("variant", "primary")
         self.open_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.open_btn.setIcon(icon("arrow-up-right", P.accent_soft, 16))
-        self.open_btn.setIconSize(QSize(16, 16))
-        self.open_btn.setFixedHeight(34)
+        self.open_btn.setIcon(icon("arrow-up-right", P.primary_text, 17))
+        self.open_btn.setIconSize(QSize(17, 17))
+        self.open_btn.setFixedHeight(40)
+        self.open_btn.setAutoDefault(False)
+        self.open_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.open_btn.clicked.connect(lambda: self._emit_action("open_primary"))
         self.dv.addWidget(self.open_btn)
 
@@ -338,7 +341,7 @@ class InspectorPanel(QFrame):
             "star-fill" if self._favorite else "star",
             P.amber if self._favorite else P.dim, 17,
         ))
-        self.open_btn.setIcon(icon("arrow-up-right", P.accent_soft, 16))
+        self.open_btn.setIcon(icon("arrow-up-right", P.primary_text, 17))
         self.net_card.setStyleSheet(
             f"QFrame#NetCard {{ background:{P.input_bg}; border:1px solid {P.border_soft}; border-radius:12px; }}"
         )
@@ -1466,7 +1469,7 @@ class SettingsPage(QWidget):
         ar = QHBoxLayout(about_row)
         ar.setContentsMargins(0, 0, 0, 0)
         ar.setSpacing(10)
-        ver = QLabel("Версия 1.0.0")
+        ver = QLabel(f"Версия {__version__}")
         ver.setStyleSheet(f"color:{P.muted}; font-size:11.5px;")
         ar.addWidget(ver)
         ar.addStretch(1)

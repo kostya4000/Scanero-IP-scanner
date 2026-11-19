@@ -6,9 +6,11 @@ import shutil
 import socket
 import struct
 import subprocess
+import threading
+import time
 from typing import Callable
 
-from PyQt6.QtCore import QProcess, QTimer, QUrl
+from PyQt6.QtCore import QProcess, QUrl
 from PyQt6.QtGui import QDesktopServices, QGuiApplication
 
 from .models import Device, Service, FILE_KINDS, TERMINAL_KINDS, WEB_KINDS
@@ -63,41 +65,47 @@ def _terminal_command(command: str) -> list[str]:
 # Bringing newly opened windows to the foreground
 # ---------------------------------------------------------------------------
 
-def _x11_windows() -> set[str]:
-    if QGuiApplication.platformName() != "xcb" or not shutil.which("xdotool"):
+def _x11_windows_raw() -> set[str]:
+    if not shutil.which("xdotool"):
         return set()
     try:
         proc = subprocess.run(
             ["xdotool", "search", "--onlyvisible", "--name", ".*"],
-            capture_output=True, text=True, timeout=2,
+            capture_output=True, text=True, timeout=1.5,
         )
         return {token for token in proc.stdout.split() if token.isdigit()}
     except Exception:
         return set()
 
 
+def _x11_windows() -> set[str]:
+    if QGuiApplication.platformName() != "xcb":
+        return set()
+    return _x11_windows_raw()
+
+
 def _activate_window(window_id: str) -> None:
     for cmd in (
         ["xdotool", "windowmap", window_id],
-        ["xdotool", "windowactivate", "--sync", window_id],
+        ["xdotool", "windowactivate", window_id],
         ["xdotool", "windowraise", window_id],
     ):
         try:
-            subprocess.run(cmd, capture_output=True, timeout=2)
+            subprocess.run(cmd, capture_output=True, timeout=1.5)
         except Exception:
             pass
 
 
-def _matching_windows(hints: tuple[str, ...]) -> list[str]:
-    found: set[str] = set()
-    if QGuiApplication.platformName() != "xcb" or not shutil.which("xdotool"):
+def _matching_windows_raw(hints: tuple[str, ...]) -> list[str]:
+    if not shutil.which("xdotool"):
         return []
+    found: set[str] = set()
     for hint in hints:
         for flag in ("--class", "--name"):
             try:
                 proc = subprocess.run(
                     ["xdotool", "search", flag, hint],
-                    capture_output=True, text=True, timeout=2,
+                    capture_output=True, text=True, timeout=1.5,
                 )
                 found.update(token for token in proc.stdout.split() if token.isdigit())
             except Exception:
@@ -106,19 +114,23 @@ def _matching_windows(hints: tuple[str, ...]) -> list[str]:
 
 
 def _focus_after(before: set[str], hints: tuple[str, ...] = ()) -> None:
-    if QGuiApplication.platformName() != "xcb":
+    """Raise/focus newly opened windows without blocking the UI thread."""
+    if QGuiApplication.platformName() != "xcb" or not shutil.which("xdotool"):
         return
 
-    def activate() -> None:
-        after = _x11_windows()
-        new = sorted(after - before, key=int)
-        targets = new[-2:] if new else _matching_windows(hints)[-2:]
-        for window_id in reversed(targets):
-            _activate_window(window_id)
+    def worker() -> None:
+        last = 0.0
+        # Several attempts handle slow starters such as Chrome/Remmina.
+        for delay in (0.8, 2.0, 3.4):
+            time.sleep(max(0.0, delay - last))
+            last = delay
+            after = _x11_windows_raw()
+            new = sorted(after - before, key=int)
+            targets = new[-2:] if new else _matching_windows_raw(hints)[-2:]
+            for window_id in reversed(targets):
+                _activate_window(window_id)
 
-    QTimer.singleShot(650, activate)
-    QTimer.singleShot(1600, activate)
-    QTimer.singleShot(3000, activate)
+    threading.Thread(target=worker, name="scanero-window-focus", daemon=True).start()
 
 
 def _scheme_hints(scheme: str) -> tuple[str, ...]:
