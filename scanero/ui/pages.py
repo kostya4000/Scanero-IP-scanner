@@ -1336,6 +1336,7 @@ class SettingsPage(QWidget):
     export_favorites = pyqtSignal()
     import_favorites = pyqtSignal()
     clear_history = pyqtSignal()
+    check_updates_requested = pyqtSignal()
     about_requested = pyqtSignal()
     repository_requested = pyqtSignal()
     reset_requested = pyqtSignal()
@@ -1503,6 +1504,14 @@ class SettingsPage(QWidget):
         self.toggle_notify.toggled.connect(lambda v: self._emit("notify", v))
         cl.addWidget(_setting_row("Уведомления", "Показывать системное уведомление после завершения сканирования.", self.toggle_notify))
         cl.addWidget(hline())
+        self.toggle_updates = ToggleSwitch()
+        self.toggle_updates.toggled.connect(lambda v: self._emit("check_updates", v))
+        cl.addWidget(_setting_row(
+            "Проверять обновления",
+            "При запуске проверять новые версии на GitHub.",
+            self.toggle_updates,
+        ))
+        cl.addWidget(hline())
         reset = QPushButton("Сбросить настройки")
         reset.setProperty("variant", "ghost")
         reset.clicked.connect(self.reset_requested.emit)
@@ -1540,6 +1549,12 @@ class SettingsPage(QWidget):
         ver.setStyleSheet(f"color:{P.muted}; font-size:11.5px;")
         ar.addWidget(ver)
         ar.addStretch(1)
+        check = QPushButton("Проверить обновления")
+        check.setProperty("variant", "ghost")
+        check.setIcon(icon("refresh", P.muted, 14))
+        check.setCursor(Qt.CursorShape.PointingHandCursor)
+        check.clicked.connect(self.check_updates_requested.emit)
+        ar.addWidget(check)
         repo = QPushButton("Репозиторий")
         repo.setProperty("variant", "ghost")
         repo.setIcon(icon("external", P.muted, 14))
@@ -1596,6 +1611,7 @@ class SettingsPage(QWidget):
             self.toggle_ssdp.setChecked(bool(self.settings.get("use_ssdp", True)))
             self.toggle_snmp.setChecked(bool(self.settings.get("use_snmp", True)))
             self.toggle_notify.setChecked(bool(self.settings.get("notify", True)))
+            self.toggle_updates.setChecked(bool(self.settings.get("check_updates", True)))
             theme = str(self.settings.get("theme", "system"))
             for mode, button in self.theme_buttons.items():
                 button.setChecked(mode == theme)

@@ -128,7 +128,6 @@ class ShutdownDialog(QDialog):
         layout.addLayout(buttons)
         scale_inline_fonts(self)
         translate_widget_tree(self)
-        translate_widget_tree(self)
 
         if not remote_shutdown_supported():
             self.submit.setEnabled(False)

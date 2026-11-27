@@ -65,12 +65,15 @@ from ..core.netinfo import (
 )
 from ..core.scanner import ScanOptions, ScanResult
 from ..core.storage import HistoryEntry, SPEED_MAP, Settings, FavoritesStore, HistoryStore
+from ..core.updater import is_newer
 from .dialogs import AboutDialog, ShutdownDialog
 from .icons import icon, pixmap
 from .pages import FavoritesPage, HistoryPage, ScannerPage, SettingsPage
 from .theme import (
     P, current_font_scale, qss, rgba, scale_inline_fonts, set_font_scale, set_theme, sp,
 )
+from .update_dialog import UpdateDialog
+from .update_worker import UpdateCheckWorker
 from .widgets import (
     IconButton, LogoWidget, NavButton, NetworkCard, Toast,
     base_font, font, plural, refresh_widget_fonts, set_widget_font,
@@ -299,6 +302,8 @@ class MainWindow(QWidget):
         self.interfaces: list[Interface] = []
         self.iface: Interface | None = None
         self.worker: ScanWorker | None = None
+        self._update_worker: UpdateCheckWorker | None = None
+        self._update_prompted_version = ""
         self._scan_started = 0.0
         self._last_result: ScanResult | None = None
         self._wide = True
@@ -415,6 +420,7 @@ class MainWindow(QWidget):
         self.settings_page.export_favorites.connect(self._export_favorites)
         self.settings_page.import_favorites.connect(self._import_favorites)
         self.settings_page.clear_history.connect(self._clear_history)
+        self.settings_page.check_updates_requested.connect(lambda: self._check_updates(manual=True))
         self.settings_page.about_requested.connect(self._show_about)
         self.settings_page.repository_requested.connect(self._open_repository)
         self.settings_page.reset_requested.connect(self._reset_settings)
@@ -452,6 +458,7 @@ class MainWindow(QWidget):
         translate_widget_tree(self)
         self.switch_page("scanner")
         QTimer.singleShot(80, self._sync_inspector)
+        QTimer.singleShot(2500, self._auto_check_updates)
 
     # -- helpers -------------------------------------------------------------
     def _divider(self) -> QFrame:
@@ -567,6 +574,8 @@ class MainWindow(QWidget):
         if self.worker is not None:
             self.worker.stop()
             self.worker.wait(2500)
+        if self._update_worker is not None:
+            self._update_worker.wait(8000)
         if self.isMaximized():
             geometry = self.normalGeometry()
             size = [geometry.width(), geometry.height()]
@@ -1208,6 +1217,54 @@ class MainWindow(QWidget):
         ok, message = open_external_url(REPO_URL)
         if not ok:
             self.toast.show_message(message, "error")
+
+    # -- updates -------------------------------------------------------------
+    def _auto_check_updates(self) -> None:
+        if "--demo" in sys.argv or "--screenshot" in sys.argv:
+            return
+        if not bool(self.settings.get("check_updates", True)):
+            return
+        self._check_updates(manual=False)
+
+    def _check_updates(self, manual: bool = False) -> None:
+        if self._update_worker is not None:
+            if manual:
+                self.toast.show_message("Проверка обновлений уже выполняется", "info")
+            return
+        if manual:
+            self.toast.show_message("Проверяем обновления…", "info")
+        worker = UpdateCheckWorker(self)
+        worker.found.connect(lambda release: self._update_found(release, manual))
+        worker.failed.connect(lambda error: self._update_failed(error, manual))
+        worker.finished.connect(self._update_check_finished)
+        self._update_worker = worker
+        worker.start()
+
+    def _update_check_finished(self) -> None:
+        worker, self._update_worker = self._update_worker, None
+        if worker is not None:
+            worker.deleteLater()
+
+    def _update_found(self, release, manual: bool) -> None:
+        if release is None:
+            if manual:
+                self.toast.show_message("Не удалось проверить обновления.", "error")
+            return
+        if not is_newer(release.version, __version__):
+            if manual:
+                self.toast.show_message("У вас установлена последняя версия.", "ok")
+            return
+        if release.version == self._update_prompted_version:
+            return
+        self._update_prompted_version = release.version
+        dialog = UpdateDialog(release, self)
+        dialog.exec()
+        if dialog.installed:
+            self._restart_application()
+
+    def _update_failed(self, error: str, manual: bool) -> None:
+        if manual:
+            self.toast.show_message("Не удалось проверить обновления.", "error")
 
     def _confirm(self, title: str, text: str) -> bool:
         box = QMessageBox(self)

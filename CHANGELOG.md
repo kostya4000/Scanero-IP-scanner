@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0 — 2026-11-27
+
+- Added automatic update checks against GitHub Releases on startup.
+- Added an update dialog with release notes, download progress and install action.
+- The downloaded `.deb` package is verified with its SHA-256 checksum before
+  installation; installation uses the graphical `pkexec` password prompt.
+- Added **Settings → Application → Check for updates** and a manual
+  **Check for updates** button in Settings → About.
+- Update messages are localized in Russian and English.
+
 ## 1.3.0 — 2026-11-27
 
 - Added English localization for the whole interface, reports and CLI.

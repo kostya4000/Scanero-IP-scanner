@@ -1,3 +1,11 @@
+scanero-ip-scanner (1.4.0) unstable; urgency=medium
+
+  * Check GitHub Releases for updates on startup.
+  * Show release notes and install the verified .deb package from the app.
+  * Add an update-check toggle and a manual check button in Settings.
+
+ -- kostya4000 <2225821+kostya4000@users.noreply.github.com>  Fri, 27 Nov 2026 18:00:00 +0300
+
 scanero-ip-scanner (1.3.0) unstable; urgency=medium
 
   * Add English localization and an interface language selector.
