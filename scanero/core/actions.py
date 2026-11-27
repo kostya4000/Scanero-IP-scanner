@@ -13,12 +13,16 @@ from typing import Callable
 from PyQt6.QtCore import QProcess, QUrl
 from PyQt6.QtGui import QDesktopServices, QGuiApplication
 
+from ..i18n import tr, translate_text
 from .models import Device, Service, FILE_KINDS, TERMINAL_KINDS, WEB_KINDS
 
 
 def notify(title: str, message: str) -> None:
     if shutil.which("notify-send"):
-        QProcess.startDetached("notify-send", ["-a", "Scanero IP", "-i", "network-wireless", title, message])
+        QProcess.startDetached("notify-send", [
+            "-a", "Scanero IP", "-i", "network-wireless",
+            translate_text(title), translate_text(message),
+        ])
 
 
 def copy_text(text: str) -> None:
@@ -26,21 +30,22 @@ def copy_text(text: str) -> None:
 
 
 def device_as_text(device: Device) -> str:
-    services = ", ".join(f"{s.name}:{s.port}" for s in device.services)
+    services = ", ".join(f"{s.display_name}:{s.port}" for s in device.services)
     lines = [
-        f"Имя: {device.name or '—'}",
+        f"{tr('Имя')}: {device.name or '—'}",
         f"IP: {device.ip}",
         f"MAC: {device.mac or '—'}",
-        f"Производитель: {device.vendor or '—'}",
-        f"Тип: {device.kind_label}",
-        f"ОС: {device.os_name or '—'}",
-        f"Сервисы: {services or '—'}",
+        f"{tr('Производитель')}: {device.vendor or '—'}",
+        f"{tr('Тип')}: {device.kind_label}",
+        f"{tr('ОС')}: {device.os_label or '—'}",
+        f"{tr('Сервисы')}: {services or '—'}",
     ]
     return "\n".join(lines)
 
 
 def _terminal_command(command: str) -> list[str]:
-    script = f"{command}; echo; read -r -p 'Нажмите Enter, чтобы закрыть…' _"
+    prompt = translate_text("Нажмите Enter, чтобы закрыть…")
+    script = f"{command}; echo; read -r -p {shlex.quote(prompt)} _"
     candidates = [
         ("gnome-terminal", ["gnome-terminal", "--", "bash", "-lc", script]),
         ("kgx", ["kgx", "--", "bash", "-lc", script]),

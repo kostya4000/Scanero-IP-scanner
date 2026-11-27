@@ -46,6 +46,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ..core.models import Device, Service
+from ..i18n import current_language, tr, translate_text
 from .icons import icon, pixmap
 from .theme import P, kind_color, rgba, service_color, sp
 
@@ -83,8 +84,20 @@ def refresh_widget_fonts(root: QWidget) -> None:
             set_widget_font(widget, stored)
 
 
+_EN_PLURALS = {
+    ("адрес", "адреса", "адресов"): ("address", "addresses"),
+    ("устройство", "устройства", "устройств"): ("device", "devices"),
+    ("сервис", "сервиса", "сервисов"): ("service", "services"),
+    ("порт", "порта", "портов"): ("port", "ports"),
+}
+
+
 def plural(n: int, one: str, few: str, many: str) -> str:
     n = abs(int(n))
+    if current_language() == "en":
+        en = _EN_PLURALS.get((one, few, many))
+        if en:
+            return en[0] if n == 1 else en[1]
     if n % 10 == 1 and n % 100 != 11:
         return one
     if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
@@ -230,7 +243,7 @@ class NavButton(QAbstractButton):
 
         p.setFont(font(13, QFont.Weight.DemiBold if self._active else QFont.Weight.Medium))
         p.setPen(QColor(P.text if self._active else (P.text_soft if self._hover > 0.4 else P.muted)))
-        p.drawText(QRect(50, 0, self.width() - 90, self.height()), Qt.AlignmentFlag.AlignVCenter, self._text)
+        p.drawText(QRect(50, 0, self.width() - 90, self.height()), Qt.AlignmentFlag.AlignVCenter, tr(self._text))
 
         if self._badge:
             fm = QFontMetrics(font(10.5, QFont.Weight.DemiBold))
@@ -303,17 +316,17 @@ class NetworkCard(QFrame):
 
         p.setFont(font(10, QFont.Weight.DemiBold))
         p.setPen(QColor(P.dim))
-        p.drawText(QRectF(58, 12, self.width() - 70, 14), Qt.AlignmentFlag.AlignLeft, "ТЕКУЩАЯ СЕТЬ")
+        p.drawText(QRectF(58, 12, self.width() - 70, 14), Qt.AlignmentFlag.AlignLeft, tr("ТЕКУЩАЯ СЕТЬ"))
 
         p.setFont(font(13, QFont.Weight.DemiBold))
         p.setPen(QColor(P.text))
-        title = iface.ssid if (iface and iface.ssid) else (iface.title if iface else "Сеть не найдена")
+        title = iface.ssid if (iface and iface.ssid) else (tr(iface.title) if iface else tr("Сеть не найдена"))
         title = QFontMetrics(p.font()).elidedText(title, Qt.TextElideMode.ElideRight, int(self.width() - 76))
         p.drawText(QRectF(58, 26, self.width() - 70, 20), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
 
         p.setFont(font(11, QFont.Weight.Medium, "JetBrains Mono"))
         p.setPen(QColor(P.muted))
-        subtitle = (f"{iface.ip}/{iface.prefix}" if iface else "нет подключения")
+        subtitle = (f"{iface.ip}/{iface.prefix}" if iface else tr("нет подключения"))
         p.drawText(QRectF(58, 46, self.width() - 70, 18), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, subtitle)
 
         dot = QPointF(22, 78)
@@ -326,7 +339,7 @@ class NetworkCard(QFrame):
         p.setFont(font(10.5, QFont.Weight.Medium))
         p.setPen(QColor(P.dim))
         p.drawText(QRectF(34, 68, self.width() - 50, 20), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                   "Подключено" if iface else "Недоступно")
+                   tr("Подключено") if iface else tr("Недоступно"))
 
 
 class StatCard(QWidget):
@@ -413,16 +426,20 @@ class StatCard(QWidget):
 
         p.setFont(font(9.8, QFont.Weight.DemiBold))
         p.setPen(QColor(P.dim))
-        p.drawText(QRectF(16, 15, self.width() - 70, 14), Qt.AlignmentFlag.AlignLeft, self._title.upper())
+        p.drawText(QRectF(16, 15, self.width() - 70, 14), Qt.AlignmentFlag.AlignLeft, tr(self._title).upper())
 
         p.setFont(font(26, QFont.Weight.DemiBold))
         p.setPen(QColor(P.text))
-        p.drawText(QRectF(15, 34, self.width() - 30, 32), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._display)
+        p.drawText(
+            QRectF(15, 34, self.width() - 30, 32),
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            tr(self._display),
+        )
 
         if self._hint:
             p.setFont(font(10.5, QFont.Weight.Medium))
             p.setPen(QColor(P.muted))
-            p.drawText(QRectF(16, 67, self.width() - 30, 16), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._hint)
+            p.drawText(QRectF(16, 67, self.width() - 30, 16), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, tr(self._hint))
 
 
 class Avatar(QWidget):
@@ -509,7 +526,7 @@ class StatusPill(QWidget):
         p.drawEllipse(QPointF(12, self.height() / 2), 3.1, 3.1)
         p.setFont(font(10.5, QFont.Weight.DemiBold))
         p.setPen(c.darker(112) if P.mode == "light" else c.lighter(115))
-        p.drawText(QRectF(20, 0, self.width() - 24, self.height()), Qt.AlignmentFlag.AlignVCenter, self._text)
+        p.drawText(QRectF(20, 0, self.width() - 24, self.height()), Qt.AlignmentFlag.AlignVCenter, tr(self._text))
 
 
 class ToggleSwitch(QAbstractButton):
@@ -892,7 +909,7 @@ class ServiceChip(QAbstractButton):
         ink = QColor(color)
         p.setPen(ink.darker(112) if P.mode == "light" else ink.lighter(125))
         fm = QFontMetrics(p.font())
-        text = fm.elidedText(self.service.name, Qt.TextElideMode.ElideRight, max(20, self.width() - 37))
+        text = fm.elidedText(tr(self.service.name), Qt.TextElideMode.ElideRight, max(20, self.width() - 37))
         p.drawText(QRectF(31, 0, self.width() - 36, self.height()), Qt.AlignmentFlag.AlignVCenter, text)
 
 
@@ -942,10 +959,11 @@ class ServiceTile(QAbstractButton):
         p.setFont(font(11.5, QFont.Weight.DemiBold))
         p.setPen(QColor(P.text_soft))
         p.drawText(QRectF(48, 6, self.width() - 72, 20), Qt.AlignmentFlag.AlignVCenter,
-                   f"{self.service.name}")
+                   tr(self.service.name))
         p.setFont(font(10))
         p.setPen(QColor(P.dim))
-        detail = self.service.product or self.service.title or f"порт {self.service.port}"
+        detail = self.service.product or self.service.title or f"{tr('порт')} {self.service.port}"
+        detail = translate_text(detail)
         detail = QFontMetrics(p.font()).elidedText(detail, Qt.TextElideMode.ElideRight, int(self.width() - 76))
         p.drawText(QRectF(48, 24, self.width() - 72, 18), Qt.AlignmentFlag.AlignVCenter, detail)
         p.setPen(QColor(P.dim))
@@ -1058,6 +1076,7 @@ class ElidedLabel(QLabel):
         self._full = text
 
     def setText(self, text: str) -> None:  # noqa: N802
+        text = translate_text(text)
         self._full = text
         super().setText(text)
 

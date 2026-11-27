@@ -38,6 +38,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr, translate_text
 from ..core.models import Device, Service, ip_to_int, kind_label
 from .icons import pixmap
 from .theme import P, kind_color, service_color
@@ -142,7 +143,10 @@ class DeviceModel(QStandardItemModel):
             item.setSelectable(True)
             item.setData(device, ROLE_DEVICE)
         items[COL_DEVICE].setToolTip(
-            f"{device.title or 'Без имени'}\n{device.ip}\n{device.vendor or 'Производитель неизвестен'}"
+            translate_text(
+                f"{device.title or 'Без имени'}\n{device.ip}\n"
+                f"{device.vendor or 'Производитель неизвестен'}"
+            )
         )
         self._fill_texts(items, device)
         self.appendRow(items)
@@ -164,7 +168,10 @@ class DeviceModel(QStandardItemModel):
                 cells.append(QStandardItem())
         self._fill_texts(cells, device)
         item.setToolTip(
-            f"{device.title or 'Без имени'}\n{device.ip}\n{device.vendor or 'Производитель неизвестен'}"
+            translate_text(
+                f"{device.title or 'Без имени'}\n{device.ip}\n"
+                f"{device.vendor or 'Производитель неизвестен'}"
+            )
         )
         self._sync_children(item, device)
         top_left = self.index(row, 0)
@@ -215,9 +222,10 @@ class DeviceModel(QStandardItemModel):
             child.setData(data, ROLE_SERVICE)
             child.setText(values[col])
             child.setEditable(False)
-        parent_item.child(row, 0).setToolTip(
-            f"{service.name} · порт {service.port}" + (f"\n{service.product}" if service.product else "")
-        )
+        parent_item.child(row, 0).setToolTip(translate_text(
+            f"{service.display_name} · {tr('порт')} {service.port}"
+            + (f"\n{service.product}" if service.product else "")
+        ))
 
 
 class DeviceFilterProxy(QSortFilterProxyModel):
@@ -315,7 +323,8 @@ class HeaderView(QHeaderView):
         painter.setPen(QColor(P.accent if active else P.dim))
         fm = QFontMetrics(painter.font())
         pad = 40 if logical_index == 0 else 14
-        text = fm.elidedText(str(label).upper(), Qt.TextElideMode.ElideRight, rect.width() - pad - 18)
+        text = tr(str(label)).upper()
+        text = fm.elidedText(text, Qt.TextElideMode.ElideRight, rect.width() - pad - 18)
         painter.drawText(
             rect.adjusted(pad, 0, -10, 0),
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
@@ -445,7 +454,7 @@ class DeviceDelegate(QStyledItemDelegate):
 
             text_x = 78
             text_w = rect.width() - text_x - 26
-            name = device.title or "Без имени"
+            name = device.title or tr("Без имени")
             painter.setFont(self.f_name)
             painter.setPen(QColor(P.text if device.is_online() else P.text_soft if device.title else P.dim))
             if not device.title:
@@ -462,8 +471,8 @@ class DeviceDelegate(QStyledItemDelegate):
                 painter.drawPixmap(QRect(star_x, base_y + 8, 12, 12), pixmap("star-fill", P.amber, 12))
 
             subtitle_bits = [device.kind_label]
-            if device.os_name and device.os_name not in ("Сетевая ОС",):
-                subtitle_bits.append(device.os_name)
+            if device.os_label and device.os_name not in ("Сетевая ОС",):
+                subtitle_bits.append(device.os_label)
             if device.vendor:
                 subtitle_bits.append(device.vendor)
             subtitle = " · ".join(subtitle_bits)
@@ -499,7 +508,7 @@ class DeviceDelegate(QStyledItemDelegate):
 
     def _paint_status(self, painter: QPainter, rect: QRect, device: Device) -> None:
         color = P.green if device.is_online() else (P.red if device.status == "offline" else P.dim)
-        text = device.status_label if device.is_online() else ("Не в сети" if device.status == "offline" else "Неизвестно")
+        text = device.status_label if device.is_online() else tr("Не в сети" if device.status == "offline" else "Неизвестно")
         fm = QFontMetrics(self.f_pill)
         width = fm.horizontalAdvance(text) + 28
         pill = QRectF(rect.left() + 10, rect.center().y() - 11, width, 22)
@@ -597,9 +606,9 @@ class DeviceDelegate(QStyledItemDelegate):
             painter.drawText(
                 QRect(text_x, row_rect.top() + 7, text_w, 16),
                 int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
-                service.name,
+                service.display_name,
             )
-            detail = service.product or service.title or ""
+            detail = service.product or tr(service.title)
             if detail:
                 painter.setFont(self.f_small)
                 painter.setPen(QColor(P.dim))
@@ -614,7 +623,7 @@ class DeviceDelegate(QStyledItemDelegate):
             painter.setPen(QColor(P.dim))
             painter.drawText(rect.adjusted(10, 0, -4, 0),
                              int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
-                             f"порт {service.port}")
+                             f"{tr('порт')} {service.port}")
         elif col == COL_SERVICES:
             button = QRectF(rect.right() - 94, row_rect.center().y() - 13, 84, 26)
             grad = QLinearGradient(button.topLeft(), button.bottomRight())
@@ -629,7 +638,7 @@ class DeviceDelegate(QStyledItemDelegate):
             painter.drawText(
                 QRectF(button.left() + 10, button.top(), 52, button.height()),
                 int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
-                "Открыть",
+                tr("Открыть"),
             )
             painter.drawPixmap(
                 QRect(int(button.right()) - 20, int(button.top()) + 7, 12, 12),

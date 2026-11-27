@@ -88,13 +88,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Scanero IP scanner {__version__}")
         return 0
     if "--help" in argv or "-h" in argv:
-        print(
+        from scanero.core.storage import Settings
+        from scanero.i18n import set_language, translate_text
+        set_language(Settings().get("language", "system"))
+        print(translate_text(
             "Scanero IP scanner — сканер локальной сети для Ubuntu\n\n"
             "Графический режим:      python3 app.py\n"
             "CLI:                    python3 app.py --cli --range 192.168.1.0/24 [--json out.json]\n"
             "Помощь по CLI:          python3 app.py --cli --help\n\n"
             "Служебные флаги демо/скриншотов: --demo --size 1460x900 --screenshot out.png"
-        )
+        ))
         return 0
 
     from PyQt6.QtGui import QFont

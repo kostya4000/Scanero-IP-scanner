@@ -9,6 +9,8 @@ import socket
 import subprocess
 from dataclasses import dataclass
 
+from ..i18n import current_language
+
 MAX_TARGETS = 65536
 SOFT_LIMIT = 4096
 
@@ -305,6 +307,8 @@ def parse_targets(expr: str, interfaces: list[Interface] | None = None) -> list[
 
 
 def _plural(n: int, one: str, few: str, many: str) -> str:
+    if current_language() == "en":
+        return one if n == 1 else many
     if n % 10 == 1 and n % 100 != 11:
         return one
     if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:

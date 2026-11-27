@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 from ..core.actions import open_external_url, remote_shutdown_supported, run_remote_shutdown
 from ..core.models import Device
 from .. import REPO_URL, __version__
+from ..i18n import translate_text, translate_widget_tree
 from .icons import icon
 from .theme import P, rgba, scale_inline_fonts, sp
 from .widgets import LogoWidget, ToggleSwitch, base_font, font, set_widget_font
@@ -126,6 +127,8 @@ class ShutdownDialog(QDialog):
         buttons.addWidget(self.submit)
         layout.addLayout(buttons)
         scale_inline_fonts(self)
+        translate_widget_tree(self)
+        translate_widget_tree(self)
 
         if not remote_shutdown_supported():
             self.submit.setEnabled(False)
@@ -146,7 +149,9 @@ class ShutdownDialog(QDialog):
             message=self.message.text().strip(),
             on_finished=self._done,
         )
-        if self._proc is None and "не найдена" not in self.status.text():
+        if self._proc is None and translate_text(
+            "Утилита net (samba-common-bin) не найдена в системе."
+        ) not in self.status.text():
             self.status.setText("Не удалось запустить команду net rpc shutdown.")
 
     def _done(self, ok: bool, text: str) -> None:
@@ -208,3 +213,4 @@ class AboutDialog(QDialog):
         buttons.addWidget(close)
         layout.addLayout(buttons)
         scale_inline_fonts(self)
+        translate_widget_tree(self)

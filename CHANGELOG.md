@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0 — 2026-11-27
+
+- Added English localization for the whole interface, reports and CLI.
+- Added an interface language selector in Settings → Appearance:
+  system (automatic), Russian or English.
+- The application detects the system language on first launch and restarts
+  automatically when the selected language changes.
+- CSV headers, HTML reports, notifications and file dialogs follow the
+  selected language.
+
 ## 1.2.1 — 2026-11-19
 
 - Fixed a stale `~/.local/bin/scanero` from earlier source installs shadowing

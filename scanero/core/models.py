@@ -5,6 +5,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..i18n import tr
+
 
 # ---------------------------------------------------------------------------
 # Services
@@ -70,8 +72,12 @@ class Service:
                 self.name = f"TCP {self.port}"
 
     @property
+    def display_name(self) -> str:
+        return tr(self.name)
+
+    @property
     def subtitle(self) -> str:
-        parts: list[str] = [f"порт {self.port}"]
+        parts: list[str] = [f"{tr('порт')} {self.port}"]
         if self.product:
             parts.append(self.product)
         elif self.title:
@@ -170,7 +176,7 @@ KIND_COLORS: dict[str, str] = {
 
 
 def kind_label(kind: str) -> str:
-    return KIND_LABELS.get(kind, "Устройство")
+    return tr(KIND_LABELS.get(kind, "Устройство"))
 
 
 # ---------------------------------------------------------------------------
@@ -216,15 +222,19 @@ class Device:
 
     @property
     def status_label(self) -> str:
-        return {
+        return tr({
             STATUS_ONLINE: "В сети",
             STATUS_OFFLINE: "Не в сети",
             STATUS_UNKNOWN: "Неизвестно",
-        }.get(self.status, "Неизвестно")
+        }.get(self.status, "Неизвестно"))
 
     @property
     def kind_label(self) -> str:
         return kind_label(self.kind)
+
+    @property
+    def os_label(self) -> str:
+        return tr(self.os_name)
 
     @property
     def service_kinds(self) -> set[str]:

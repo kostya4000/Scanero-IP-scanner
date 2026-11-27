@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Iterable
 
+from ..i18n import current_language, tr
 from .models import Device, STATUS_ONLINE, kind_label
 
 
@@ -19,7 +20,7 @@ def _online(devices: Iterable[Device]) -> list[Device]:
 
 
 def _service_text(device: Device) -> str:
-    return ", ".join(f"{s.name} ({s.port})" for s in device.services)
+    return ", ".join(f"{s.display_name} ({s.port})" for s in device.services)
 
 
 def export_csv(path: str | Path, devices: Iterable[Device]) -> None:
@@ -27,7 +28,7 @@ def export_csv(path: str | Path, devices: Iterable[Device]) -> None:
     rows = _online(devices)
     with open(path, "w", encoding="utf-8-sig", newline="") as fh:
         writer = csv.writer(fh, delimiter=";", lineterminator="\r\n")
-        writer.writerow(HEADERS)
+        writer.writerow([tr(header) for header in HEADERS])
         for d in rows:
             writer.writerow([
                 d.status_label,
@@ -36,7 +37,7 @@ def export_csv(path: str | Path, devices: Iterable[Device]) -> None:
                 d.mac,
                 d.vendor,
                 kind_label(d.kind),
-                d.os_name,
+                d.os_label,
                 _service_text(d),
                 d.netbios,
                 d.workgroup,
@@ -72,29 +73,29 @@ def export_html(path: str | Path, devices: Iterable[Device], meta: dict | None =
     body_rows = []
     for d in rows:
         chips = "".join(
-            f'<span class="chip">{esc(s.name)} <b>{s.port}</b></span>' for s in d.services
+            f'<span class="chip">{esc(s.display_name)} <b>{s.port}</b></span>' for s in d.services
         ) or '<span class="dim">—</span>'
         body_rows.append(f"""
         <tr>
           <td><span class="dot"></span></td>
-          <td><div class="name">{esc(d.name or d.hostname) or '<span class="dim">Без имени</span>'}</div>
+          <td><div class="name">{esc(d.name or d.hostname) or f'<span class="dim">{esc(tr("Без имени"))}</span>'}</div>
               <div class="sub">{esc(d.vendor) or esc(kind_label(d.kind))}</div></td>
           <td class="mono">{esc(d.ip)}</td>
           <td class="mono dim">{esc(d.mac) or '—'}</td>
           <td>{esc(d.vendor) or '—'}</td>
-          <td>{esc(d.os_name) or '—'}</td>
+          <td>{esc(d.os_label) or '—'}</td>
           <td>{chips}</td>
         </tr>""")
     rows_html = "\n".join(body_rows) if body_rows else (
-        '<tr><td colspan="7" class="empty">Устройства не найдены</td></tr>'
+        f'<tr><td colspan="7" class="empty">{esc(tr("Устройства не найдены"))}</td></tr>'
     )
 
     doc = f"""<!doctype html>
-<html lang="ru">
+<html lang="{current_language()}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scanero IP scanner · Отчёт о сканировании</title>
+<title>Scanero IP scanner · {esc(tr("Отчёт о сканировании"))}</title>
 <style>
   :root {{ color-scheme: dark; }}
   * {{ box-sizing: border-box; }}
@@ -141,20 +142,20 @@ def export_html(path: str | Path, devices: Iterable[Device], meta: dict | None =
     <div class="logo"></div>
     <div>
       <h1>Scanero IP scanner</h1>
-      <p class="meta muted">Отчёт о сканировании · {generated}</p>
+      <p class="meta muted">{esc(tr("Отчёт о сканировании"))} · {generated}</p>
     </div>
   </div>
   <div class="cards">
-    <div class="card"><div class="value green">{len(rows)}</div><div class="label">Устройств в сети</div></div>
-    <div class="card"><div class="value indigo">{services}</div><div class="label">Открытых сервисов</div></div>
-    <div class="card"><div class="value cyan">{esc(range_expr) or '—'}</div><div class="label">Диапазон сканирования</div></div>
-    <div class="card"><div class="value red">{duration:.1f} с</div><div class="label">Длительность</div></div>
+    <div class="card"><div class="value green">{len(rows)}</div><div class="label">{esc(tr("Устройств в сети"))}</div></div>
+    <div class="card"><div class="value indigo">{services}</div><div class="label">{esc(tr("Открытых сервисов"))}</div></div>
+    <div class="card"><div class="value cyan">{esc(range_expr) or '—'}</div><div class="label">{esc(tr("Диапазон сканирования"))}</div></div>
+    <div class="card"><div class="value red">{duration:.1f} {"s" if current_language() == "en" else "с"}</div><div class="label">{esc(tr("Длительность"))}</div></div>
   </div>
   <table>
-    <thead><tr><th></th><th>Устройство</th><th>IP-адрес</th><th>MAC</th><th>Производитель</th><th>ОС</th><th>Сервисы</th></tr></thead>
+    <thead><tr><th></th><th>{esc(tr("Устройство"))}</th><th>{esc(tr("IP-адрес"))}</th><th>MAC</th><th>{esc(tr("Производитель"))}</th><th>{esc(tr("ОС"))}</th><th>{esc(tr("Сервисы"))}</th></tr></thead>
     <tbody>{rows_html}</tbody>
   </table>
-  <footer>Создано в Scanero IP scanner · сканер локальной сети для Ubuntu</footer>
+  <footer>{esc(tr("Создано в Scanero IP scanner · сканер локальной сети для Ubuntu"))}</footer>
 </div>
 </body>
 </html>"""
@@ -170,4 +171,4 @@ def export(path: str | Path, devices: Iterable[Device], fmt: str, meta: dict | N
     elif fmt in ("html", "htm"):
         export_html(path, devices, meta)
     else:
-        raise ValueError(f"Неизвестный формат: {fmt}")
+        raise ValueError(tr("Неизвестный формат: {fmt}", fmt=fmt))

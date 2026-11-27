@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import sys
 import time
 from dataclasses import fields
 from pathlib import Path
 
-from PyQt6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QPoint, QProcess, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QFont,
@@ -35,6 +37,10 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import __version__, REPO_URL
+from ..i18n import (
+    current_language, install_text_hooks, resolve_language, set_language, tr,
+    translate_menu, translate_widget_tree,
+)
 from ..core.actions import (
     copy_text,
     device_as_text,
@@ -276,6 +282,8 @@ class MainWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
         self.settings = Settings()
+        set_language(self.settings.get("language", "system"))
+        install_text_hooks()
         self._theme_pref = str(self.settings.get("theme", "system"))
         self._resolved_theme = set_theme(self._theme_pref)
         self._applying_theme = False
@@ -441,6 +449,7 @@ class MainWindow(QWidget):
         self._restore_geometry()
         self.scanner.inspector.apply_font_scale(current_font_scale())
         scale_inline_fonts(self, current_font_scale())
+        translate_widget_tree(self)
         self.switch_page("scanner")
         QTimer.singleShot(80, self._sync_inspector)
 
@@ -629,6 +638,7 @@ class MainWindow(QWidget):
         if self.iface and self.iface.whole_subnet != self.iface.default_range:
             whole = menu.addAction(icon("target", P.muted, 15), f"Сканировать всю подсеть {self.iface.whole_subnet}")
             whole.triggered.connect(lambda: self._scan_with_range(self.iface.whole_subnet))
+        translate_menu(menu)
         menu.exec(self.network_card.mapToGlobal(self.network_card.rect().topRight()))
         self.network_card.set_interface(self.iface)
 
@@ -669,14 +679,10 @@ class MainWindow(QWidget):
             self.toast.show_message(str(exc), "error")
             return
         if len(targets) > 4096:
-            answer = QMessageBox.question(
-                self,
+            if not self._confirm(
                 "Большой диапазон",
-                f"Будет просканировано {len(targets)} адресов. Это может занять несколько минут.\n\nПродолжить?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
+                tr("Будет просканировано {count} адресов. Это может занять несколько минут.\n\nПродолжить?", count=len(targets)),
+            ):
                 return
 
         self.scanner.range_edit.setText(expr)
@@ -930,14 +936,7 @@ class MainWindow(QWidget):
         if not self.history.items:
             self.toast.show_message("История уже пуста", "info")
             return
-        answer = QMessageBox.question(
-            self,
-            "Очистить историю",
-            "Удалить все сохранённые результаты сканирований?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer == QMessageBox.StandardButton.Yes:
+        if self._confirm("Очистить историю", "Удалить все сохранённые результаты сканирований?"):
             self.history.clear()
             self.history_page.refresh([])
             self.toast.show_message("История очищена", "ok")
@@ -959,7 +958,7 @@ class MainWindow(QWidget):
             "html": "HTML (*.html)",
         }
         path, chosen_filter = QFileDialog.getSaveFileName(
-            self, "Экспорт отчёта", default, ";;".join(filters.values())
+            self, tr("Экспорт отчёта"), default, ";;".join(filters.values())
         )
         if not path:
             return
@@ -994,7 +993,7 @@ class MainWindow(QWidget):
             self.toast.show_message("Список избранного пуст", "error")
             return
         default = str(Path.home() / f"scanero_favorites_{time.strftime('%Y%m%d')}.json")
-        path, _ = QFileDialog.getSaveFileName(self, "Экспорт избранного", default, "JSON (*.json)")
+        path, _ = QFileDialog.getSaveFileName(self, tr("Экспорт избранного"), default, "JSON (*.json)")
         if not path:
             return
         try:
@@ -1009,7 +1008,7 @@ class MainWindow(QWidget):
             self.toast.show_message(f"Ошибка экспорта: {exc}", "error")
 
     def _import_favorites(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Импорт избранного", str(Path.home()), "JSON (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, tr("Импорт избранного"), str(Path.home()), "JSON (*.json)")
         if not path:
             return
         try:
@@ -1029,6 +1028,15 @@ class MainWindow(QWidget):
             self.settings.set("font_scale", float(value), save=False)
             self._apply_font_scale(float(value))
             self._save_timer.start()
+            return
+        if key == "language":
+            preference = str(value)
+            self.settings.set("language", preference, save=False)
+            self.settings.save()
+            if resolve_language(preference) != current_language():
+                self._restart_application()
+            else:
+                self.settings_page.refresh_from_settings()
             return
         if key == "speed":
             speed = SPEED_MAP.get(int(value), SPEED_MAP[3])
@@ -1200,6 +1208,36 @@ class MainWindow(QWidget):
         ok, message = open_external_url(REPO_URL)
         if not ok:
             self.toast.show_message(message, "error")
+
+    def _confirm(self, title: str, text: str) -> bool:
+        box = QMessageBox(self)
+        box.setWindowTitle(tr(title))
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setText(tr(text))
+        yes = box.addButton(tr("Да"), QMessageBox.ButtonRole.YesRole)
+        no = box.addButton(tr("Нет"), QMessageBox.ButtonRole.NoRole)
+        box.setDefaultButton(no)
+        box.exec()
+        return box.clickedButton() is yes
+
+    def _restart_application(self) -> None:
+        self.settings.save()
+        script = Path(sys.argv[0]).resolve()
+        if script.name == "app.py" and script.exists():
+            program, arguments = sys.executable, [str(script)]
+        elif shutil.which("scanero"):
+            program, arguments = shutil.which("scanero"), []
+        elif script.exists():
+            program, arguments = sys.executable, [str(script)]
+        else:
+            self.toast.show_message(tr("Не удалось перезапустить приложение"), "error")
+            return
+        ok, _ = QProcess.startDetached(program, arguments)
+        if not ok:
+            self.toast.show_message(tr("Не удалось перезапустить приложение"), "error")
+            return
+        self.close()
+        QApplication.quit()
 
     def _show_about(self) -> None:
         AboutDialog(self).exec()

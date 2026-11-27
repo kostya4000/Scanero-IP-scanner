@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import __version__
+from ..i18n import translate_menu, translate_widget_tree, tr
 from ..core.models import Device, Favorite, Service, kind_label
 from ..core.netinfo import Interface, describe_targets, list_interfaces, parse_targets
 from ..core.storage import HistoryEntry, Settings
@@ -945,6 +946,7 @@ class ScannerPage(QWidget):
             self._request_scan()
 
     def _show_export_menu(self) -> None:
+        translate_menu(self.export_menu)
         self.export_menu.exec(
             self.export_btn.mapToGlobal(self.export_btn.rect().bottomLeft())
         )
@@ -967,6 +969,7 @@ class ScannerPage(QWidget):
         act_c.triggered.connect(self._set_class_c)
         act = menu.addAction(icon("settings", P.muted, 15), "Настройки сканирования")
         act.triggered.connect(self.settings_requested.emit)
+        translate_menu(menu)
         menu.exec(self.network_btn.mapToGlobal(self.network_btn.rect().bottomLeft()))
 
     def _set_range(self, text: str) -> None:
@@ -1035,6 +1038,7 @@ class ScannerPage(QWidget):
         ):
             act = menu.addAction(icon(icon_name, P.muted, 15), label)
             act.triggered.connect(lambda _=False, a=action, d=device: self.action_requested.emit(a, d))
+        translate_menu(menu)
         menu.exec(self.tree.viewport().mapToGlobal(pos))
 
 
@@ -1100,6 +1104,7 @@ class FavoriteCard(QFrame):
         remove.clicked.connect(lambda: self.remove_clicked.emit(self.favorite))
         layout.addWidget(remove)
         scale_inline_fonts(self)
+        translate_widget_tree(self)
 
 
 class FavoritesPage(QWidget):
@@ -1254,6 +1259,7 @@ class HistoryCard(QFrame):
         repeat.clicked.connect(lambda: self.repeat_clicked.emit(self.entry))
         layout.addWidget(repeat)
         scale_inline_fonts(self)
+        translate_widget_tree(self)
 
 
 class HistoryPage(QWidget):
@@ -1397,6 +1403,30 @@ class SettingsPage(QWidget):
         fb.addWidget(self.font_slider)
         fb.addWidget(self.font_value)
         cl.addWidget(_setting_row("Размер шрифта", "Масштаб текста интерфейса от 85% до 120%.", font_box))
+        cl.addWidget(hline())
+        lang_box = QWidget()
+        lb = QHBoxLayout(lang_box)
+        lb.setContentsMargins(0, 0, 0, 0)
+        lb.setSpacing(5)
+        self.language_group = QButtonGroup(self)
+        self.language_group.setExclusive(True)
+        self.language_buttons: dict[str, QPushButton] = {}
+        for mode, label in (("system", "Системный"), ("ru", "Русский"), ("en", "English")):
+            btn = QPushButton(label)
+            btn.setProperty("chip", "true")
+            btn.setProperty("languageMode", mode)
+            btn.setCheckable(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(30)
+            btn.clicked.connect(lambda _=False, m=mode: self._language_changed(m))
+            self.language_group.addButton(btn)
+            self.language_buttons[mode] = btn
+            lb.addWidget(btn)
+        cl.addWidget(_setting_row(
+            "Язык интерфейса",
+            "Автоматически по языку системы. При смене приложение перезапустится.",
+            lang_box,
+        ))
         self.layout.addWidget(card)
 
         # performance
@@ -1540,6 +1570,9 @@ class SettingsPage(QWidget):
     def _theme_changed(self, mode: str) -> None:
         self._emit("theme", mode)
 
+    def _language_changed(self, mode: str) -> None:
+        self._emit("language", mode)
+
     def _font_changed(self, value: int) -> None:
         self.font_value.setText(f"{value}%")
         if not self._loading:
@@ -1569,6 +1602,9 @@ class SettingsPage(QWidget):
             font_percent = int(round(float(self.settings.get("font_scale", 1.0)) * 100))
             self.font_slider.setValue(max(85, min(120, font_percent)))
             self.font_value.setText(f"{self.font_slider.value()}%")
+            language = str(self.settings.get("language", "system"))
+            for mode, button in self.language_buttons.items():
+                button.setChecked(mode == language)
             self.ports.setText(str(self.settings.get("ports", "")))
             self.ports.setCursorPosition(0)
         finally:

@@ -1,3 +1,11 @@
+scanero-ip-scanner (1.3.0) unstable; urgency=medium
+
+  * Add English localization and an interface language selector.
+  * Detect the system language automatically; restart on language change.
+  * Localize reports, notifications, file dialogs and the CLI.
+
+ -- kostya4000 <2225821+kostya4000@users.noreply.github.com>  Fri, 27 Nov 2026 12:00:00 +0300
+
 scanero-ip-scanner (1.2.0) unstable; urgency=medium
 
   * Add adjustable interface font size (85–120%).
